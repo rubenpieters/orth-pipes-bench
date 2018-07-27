@@ -1,0 +1,24 @@
+name:                orth-pipes-bench
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/rubenpieters/orth-pipes-bench#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Ruben Pieters
+maintainer:          rubenpietersgithub@gmail.com
+copyright:           2018 Ruben Pieters
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+extra-source-files:  README.md
+
+executable orth-pipes-bench
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  build-depends:       base == 4.10.1.0
+                     , pipes == 4.3.9
+                     , transformers == 0.5.2.0
+                     , criterion == 1.3.0.0
+                     , conduit == 1.3.0.2
