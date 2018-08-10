@@ -19,17 +19,17 @@ with open("plot/bench.csv", "rt", encoding="utf8") as benchfile:
         line_nr += 1
 
 for bench_name in data.keys():
-    print("benchmark - " + bench_name)
+    # print("benchmark - " + bench_name)
     for bench_type in data[bench_name].keys():
-        print ("type - " + bench_type)
+        # print ("type - " + bench_type)
         filename = bench_name + "_" + bench_type + ".tmp"
-        print ("filling: " + filename)
+        # print ("filling: " + filename)
         file = open("plot/" + filename, "w")
 
         for bench_n in data[bench_name][bench_type].keys():
             (bench_mean, bench_mean_lb, bench_mean_ub) = data[bench_name][bench_type][bench_n]
             line = bench_n + " " + bench_mean + " " + bench_mean_lb + " " + bench_mean_ub
-            print ("line: " + line)
+            # print ("line: " + line)
             file.write(line + "\n")
 
         file.close()

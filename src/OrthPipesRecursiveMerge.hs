@@ -16,11 +16,10 @@ newtype MS m a = MS { unMS :: (m (MS m a) -> a) -> a}
 
 
 newtype Proxy a' a b' b m r = Proxy { unProxy ::
-    (a' -> (a -> ReS a a' r) -> r) -> -- request
-    (b -> (b' -> ReS b' b r) -> r) -> -- respond
-    (m (MS m r) -> r) ->              -- lift m
-    r ->                              -- exit
-    r
+    (a' -> (a -> ReS a a' (m r)) -> m r) -> -- request
+    (b -> (b' -> ReS b' b (m r)) -> m r) -> -- respond
+    m r ->                            -- exit
+    m r
   }
 
 newtype ProxyC a' a b' b m x = ProxyC { unProxyC :: forall r.
@@ -39,63 +38,59 @@ instance Monad (ProxyC a' a b' b m) where
   p >>= f = ProxyC (\k -> unProxyC p (\x -> unProxyC (f x) k))
 
 instance MonadTrans (ProxyC a' a b' b) where
-    lift mr = ProxyC (\k ->
-      Proxy (\req res m e ->
-        m (fmap ((\proxy -> MS (\m' -> unProxy proxy req res m' e)) . k) mr)
+    lift ma = ProxyC (\k -> Proxy (\req res e ->
+      do a <- ma
+         unProxy (k a) req res e
       ))
 
 yield :: a -> ProxyC x' x a' a m a'
 yield a = ProxyC (\k ->
-  Proxy (\req res m e -> res a (\x ->
-    ReS (\res' -> unProxy (k x) req res' m e))
+  Proxy (\req res e -> res a (\x ->
+    ReS (\res' -> unProxy (k x) req res' e))
   ))
 
 request :: a' -> ProxyC a' a y' y m a
 request a' = ProxyC (\k ->
-  Proxy (\req res m e -> req a' (\x ->
-    ReS (\req' -> unProxy (k x) req' res m e))
+  Proxy (\req res e -> req a' (\x ->
+    ReS (\req' -> unProxy (k x) req' res e))
   ))
 
 await :: ProxyC () a y' y m a
 await = request ()
 
 exit :: ProxyC a' a b' b m x
-exit = ProxyC (\_ -> Proxy (\_ _ _ e -> e))
+exit = ProxyC (\_ -> Proxy (\_ _ e -> e))
 
 mergeLProxy ::
-  (a' -> (a -> ReS a a' r) -> r) ->
-  (c -> (c' -> ReS c' c r) -> r) ->
-  (m (MS m r) -> r) ->
-  r ->
+  (a' -> (a -> ReS a a' (m r)) -> m r) ->
+  (c -> (c' -> ReS c' c (m r)) -> m r) ->
+  m r ->
   (b' -> Proxy a' a b' b m r) ->
   Proxy b' b c' c m r ->
-  r
-mergeLProxy req res m e fb' q = unProxy q
-  (\b' fb -> mergeRProxy req res m e (fb' b') (\b -> Proxy (\req' _ _ _ -> unReS (fb b) req')))
+  m r
+mergeLProxy req res e fb' q = unProxy q
+  (\b' fb -> mergeRProxy req res e (fb' b') (\b -> Proxy (\req' _ _ -> unReS (fb b) req')))
   res
-  m
   e
 
 mergeRProxy ::
-  (a' -> (a -> ReS a a' r) -> r) ->
-  (c -> (c' -> ReS c' c r) -> r) ->
-  (m (MS m r) -> r) ->
-  r ->
+  (a' -> (a -> ReS a a' (m r)) -> m r) ->
+  (c -> (c' -> ReS c' c (m r)) -> m r) ->
+  m r ->
   Proxy a' a b' b m r ->
   (b -> Proxy b' b c' c m r) ->
-  r
-mergeRProxy req res m e p fb = unProxy p
+  m r
+mergeRProxy req res e p fb = unProxy p
   req
-  (\b fb' -> mergeLProxy req res m e (\b' -> Proxy (\_ res' _ _ -> unReS (fb' b') res')) (fb b))
-  m
+  (\b fb' -> mergeLProxy req res e (\b' -> Proxy (\_ res' _ -> unReS (fb' b') res')) (fb b))
   e
 
 mergeProxy ::
   (b' -> Proxy a' a b' b m r) ->
   Proxy b' b c' c m r ->
   Proxy a' a c' c m r
-mergeProxy fp q = Proxy (\req res m e ->
-    mergeLProxy req res m e fp q
+mergeProxy fp q = Proxy (\req res e ->
+    mergeLProxy req res e fp q
   )
 
 (+>>) ::
@@ -104,8 +99,8 @@ mergeProxy fp q = Proxy (\req res m e ->
   ProxyC a' a c' c m r
 (+>>) fp q =
   ProxyC (\_ -> mergeProxy
-    ((\p -> unProxyC p (\_ -> Proxy (\_ _ _ e -> e))) . fp)
-    (unProxyC q (\_ -> Proxy (\_ _ _ e -> e)))
+    ((\p -> unProxyC p (\_ -> Proxy (\_ _ e -> e))) . fp)
+    (unProxyC q (\_ -> Proxy (\_ _ e -> e)))
   )
 
 (>->) ::
@@ -115,6 +110,7 @@ mergeProxy fp q = Proxy (\req res m e ->
 (>->) p1 p2 = (\() -> p1) +>> p2
 
 --
+
 
 type Pipe a b = ProxyC () a () b
 
@@ -164,16 +160,10 @@ fixInpSP1 inp _ h = inp (\i -> unReS (h i) (fixInpSP1 inp))
 fixOutSP2 :: (o -> a -> a) -> (o -> (() -> ReS () o a) -> a)
 fixOutSP2 out o h = out o (unReS (h ()) (fixOutSP2 out))
 
-fixMMS :: (Monad m) => m (MS m (m a)) -> m a
-fixMMS h = do
-  h' <- h
-  unMS h' fixMMS
-
 runPipesIO :: (Read i, Show o) => Pipe i o IO () -> IO ()
-runPipesIO proxyc = unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ _ -> return ())))
+runPipesIO proxyc = unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ -> return ())))
   (fixInpSP1 (\h -> do x <- readLn; h x))
   (fixOutSP2 (\o q -> do print o; q))
-  fixMMS
   (return ())
 
 runPrimes :: Int -> IO ()
@@ -185,15 +175,11 @@ runDeepPipe n = runPipesIO (deepPipe n >-> take n)
 runDeepSeq :: Int -> IO ()
 runDeepSeq n = runPipesIO (deepSeq n >-> take n)
 
-fixIMS :: Identity (MS Identity a) -> a
-fixIMS x = unMS (runIdentity x) fixIMS
-
 runPipesCollect :: Pipe () o Identity a -> [o]
-runPipesCollect proxyc = unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ _ -> [])))
+runPipesCollect proxyc = runIdentity $ unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ -> return [])))
   (fixInpSP1 (\h -> h ()))
-  (fixOutSP2 (\o q -> o : q))
-  fixIMS
-  []
+  (fixOutSP2 (\o (Identity q) -> return (o : q)))
+  (return [])
 
 deepPipePure :: Int -> [Int]
 deepPipePure n = runPipesCollect (deepPipe n >-> take n)
