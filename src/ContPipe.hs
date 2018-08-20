@@ -15,6 +15,7 @@ import System.IO(stdout, hFlush)
 import Control.Applicative(Applicative)
 import Control.Monad(liftM, ap)
 import Data.IORef
+       
 
 -- Pipe interface
 
@@ -51,7 +52,7 @@ data DirectPipe i o a =
   | Output o (DirectPipe i o a)
   | Done a
   | forall b . Effect (IO b) (b -> DirectPipe i o a)
-  | Exit
+  | Exit   
 
 instance PipeKit DirectPipe where
   input = Input (\ x -> return x)
@@ -67,7 +68,6 @@ instance PipeKit DirectPipe where
       Exit -> Exit
     where
       infixl 1 //*
-      (//*) :: DirectPipe i h Empty -> (h -> DirectPipe h o Empty) -> DirectPipe i o a
       p //* h =
         case p of
           Input k -> Input (\ x -> k x //* h)
@@ -139,8 +139,8 @@ instance Monad_f ContPipe where
   return_f x = MkPipe (\ k -> k x)
 
   bind_f p f =
-    MkPipe (\k ik ok ->
-      runPipe p (\ x -> runPipe (f x) k) ik ok)
+    MkPipe (\ k ->
+      runPipe p (\ x -> runPipe (f x) k))
 
 type Answer = IO ()
 
@@ -185,8 +185,10 @@ join p q =
               do ok <- readIORef or;
                   resume_out ok (x, y) (MkInCont (\ ok' ->
                     do writeIORef or ok'; loop ik1' ik2'))))))
+
         k0 x _ _ =
           do ik <- readIORef ir; ok <- readIORef or; k x ik ok
+
         ik0 =
           MkInCont (\ ok' ->
             do ik <- readIORef ir; resume_in ik (MkOutCont (\ x ik' ->
@@ -241,195 +243,6 @@ runHalfPipe p = runDirPipe (reify p)
 
 ------------------------------------------------------------------
 
-k9 = error "terminated"
-
--- Church Encoded version
-
-newtype ChurchP i o b = ChurchP
-  { unChP :: forall a.
-    ((i -> a) -> a) ->
-    (o -> a -> a) ->
-    (b -> a) ->
-    -- continuation for exit action
-    a ->
-    a
-  }
-
-instance PipeKit ChurchP where
-  input = ChurchP (\ik ok k _ -> ik k)
-  output x = ChurchP (\ik ok k _ -> ok x (k ()))
-  p // q = merge p q
-  -- effect is left as undefined here,
-  -- since it is not needed for benchmark
-  effect e = undefined -- ChurchP (\ik ok k -> (do x <- e; k x))
-  exit = ChurchP (\ik ok k ek -> ek)
-
-newtype A i x o a = A { unA :: B i x o a -> ChurchP i o a }
-newtype B i x o a = B { unB :: (x -> A i x o a) -> ChurchP i o a }
-
-merge p q = unA (pA q) (qB p)
-  where
-    pA :: ChurchP x o a -> A i x o b
-    pA p = unChP p
-           (\h -> A (\(B p) -> p h))
-           (\v (A r) -> A (\p -> output v >> r p))
-           k9
-           (A (const exit))
-    qB :: ChurchP i x a -> B i x o b
-    qB q = unChP q
-           (\g -> B (\h -> input >>= (\v -> (unB $ g v) h)))
-           (\v r -> B (\h -> (unA $ h v) r))
-           k9
-           (B (const exit))
-
-instance Monad_f ChurchP where
-  return_f x =
-    ChurchP (\ik ok k ek -> k x)
-  bind_f (ChurchP f) g =
-    ChurchP (\ik ok k ek -> f ik ok (\a -> unChP (g a) ik ok k ek) ek)
-
-runChurchP :: (Read i, Show o) => ChurchP i o a -> IO ()
-runChurchP (ChurchP f) = f
-  (\h -> readLn >>= h)
-  (\v r -> print v >> r)
-  (const skip)
-  skip
-
-------------------------------------------------------------------
-
-type T2 i o = ((i -> Result i o) -> Result i o) ->
-              (o -> Result i o -> Result i o) ->
-              Result i o
-
-newtype ChurchP2 i o b = ChurchP2
-  { unChP2 ::
-    (b -> Result i o) ->
-    ((i -> Result i o) -> Result i o) ->
-    (o -> Result i o -> Result i o) ->
-    Result i o
-  }
-
-ch2ToCont :: ChurchP2 i o b -> ContPipe i o b
-ch2ToCont (ChurchP2 f) = MkPipe (conv . f)
-  where
-    conv :: T2 i o -> Result i o
-    conv f = \ii oo -> f (\h ii' oo' -> resume_in ii (MkOutCont (\i ii'' -> h i ii'' oo')))
-                         (\o t1 ii' oo' -> resume_out oo o (MkInCont (\oo'' -> t1 ii' oo'')))
-                         ii
-                         oo
-
-ch2ToCont' :: ChurchP2 i o b -> ContPipe i o b
-ch2ToCont' (ChurchP2 f) = MkPipe (\a -> f a f1 f2)
-  where
-    f1 :: (i -> Result i o) -> Result i o
-    f1 h = \ii oo -> resume_in ii (MkOutCont (\i ii' -> h i ii' oo))
-    f2 :: o -> Result i o -> Result i o
-    f2 o result = \ii oo -> resume_out oo o (MkInCont (\oo' -> result ii oo'))
-
-type T3 i o = ((i -> InCont i -> Answer) -> Answer) ->
-              (o -> (OutCont o -> Answer) -> Answer) ->
-              Answer
-
-contToCh2 :: ContPipe i o b -> ChurchP2 i o b
-contToCh2 (MkPipe f) = ChurchP2 (conv . f)
-  where
-    conv :: Result i o -> T2 i o
-    conv = undefined
-
-instance PipeKit ChurchP2 where
-  input = ChurchP2 (\k ik ok -> ik k)
-  output x = ChurchP2 (\k ik ok -> ok x (k ()))
-  p // q = contToCh2 (ch2ToCont p // ch2ToCont q)
-  -- effect is left as undefined here,
-  -- since it is not needed for benchmark
-  effect e = undefined
-  exit = ChurchP2 (\k ik ok _ _ -> skip)
-
-instance Monad_f ChurchP2 where
-  return_f x =
-    ChurchP2 (\k ik ok -> k x)
-  bind_f (ChurchP2 f) g =
-    ChurchP2 (\k ik ok -> f (\a -> unChP2 (g a) k ik ok) ik ok)
-
-runChurchP2 :: (Read i, Show o) => ChurchP2 i o a -> IO ()
-runChurchP2 p = runContPipe (ch2ToCont p)
-
-------------------------------------------------------------------
-
-newtype ScottP i o x = ScottP
-  { unScottP :: forall a.
-    ((i -> ScottP i o x) -> a) ->
-    (o -> ScottP i o x -> a) ->
-    (x -> a) ->
-    a
-  }
-
-instance PipeKit ScottP where
-  input = ScottP (\input output done -> input (\v -> return v))
-  output v = ScottP (\input output done -> output v (return ()))
-  p // (ScottP q) = q
-    (\h -> p //* h)
-    (\v r -> ScottP (\input output done -> output v (p // r)))
-    (\x -> error "terminated")
-    where
-      (//*) :: ScottP i h Empty -> (h -> ScottP h o Empty) -> ScottP i o a
-      (ScottP p) //* h = p
-        (\g -> ScottP (\input output done -> input (\v -> g v //* h)))
-        (\v r -> r // h v)
-        (\x -> error "terminated")
-  -- effect is left as undefined here,
-  -- since it is not needed for benchmark
-  effect e = undefined
-  exit = undefined
-
-newtype SP1 i a = SP1 { unSP1 :: ((i -> SP1 i a) -> a)}
-newtype SP2 o a = SP2 { unSP2 :: (o -> SP2 o a -> a) -> a}
-
-instance Monad_f ScottP where
-  return_f x = ScottP (\input output done -> done x)
-  bind_f (ScottP p) f = p
-    (\h -> ScottP (\input output done -> input (\v -> h v >>= f)))
-    (\v r -> ScottP (\input output done -> output v (r >>= f)))
-    (\x -> f x)
-
-------------------------------------------------------------------
-newtype HSP i o a = HSP { unHSP ::
-  ((i -> HSP i o a) -> a) ->
-  (o -> HSP i o a -> a) ->
-  a
-}
-
-newtype ContT m r a = ContT { runContT :: (a -> m r) -> m r }
-
-instance Functor (ContT m r) where
-  fmap = liftM
-
-instance Monad (ContT m r) where
-  return x  =  ContT (\k -> k x)
-  m >>= f   =  ContT (\k -> runContT m (\x -> runContT (f x) k))
-
-instance Applicative (ContT m r) where
-  pure = return
-  (<*>) = ap
-
-newtype CHSP r i o a = CHSP { unCHSP :: ContT (HSP i o) r a }
-
-instance Monad_f (CHSP r) where
-  return_f x = CHSP (ContT (\k -> k x))
-  bind_f m f = CHSP (ContT (\k -> (runContT . unCHSP) m (\x -> (runContT . unCHSP) (f x) k)))
-
-instance PipeKit (CHSP r) where
-  input = CHSP (ContT (\k -> HSP (\inp out -> inp k)))
-  output v = CHSP (ContT (\k -> HSP (\inp out -> out v (k ()))))
-  p // q = undefined
-  -- effect is left as undefined here,
-  -- since it is not needed for benchmark
-  effect e = undefined
-  exit = undefined
-
-
-------------------------------------------------------------------
-
 -- Representation function
 
 rep :: DirectPipe i o a -> ContPipe i o a
@@ -481,10 +294,10 @@ map f = forever (do x <- input; output (f x))
 
 sieve :: PipeKit pipe => pipe Int Int Empty
 sieve =
-  do p <- input; output p; (filter (\ x -> x `mod` p /= 0)) // sieve
+  do p <- input; output p; (ContPipe.filter (\ x -> x `mod` p /= 0)) // sieve
 
 primes :: PipeKit pipe => Int -> pipe () Int Empty
-primes n = upfrom 2 // sieve // take n
+primes n = upfrom 2 // sieve // ContPipe.take n
 
 readLine :: PipeKit pipe => pipe u String ()
 readLine = do s <- effect (do putStr "> "; hFlush stdout; getLine); output s
@@ -494,7 +307,7 @@ putLine = do s <- input; effect (putStrLn s)
 
 rev :: PipeKit pipe => pipe () () ()
 rev =
-  forever readLine // map reverse // forever putLine
+  forever readLine // ContPipe.map reverse // forever putLine
 
 deep_pipe :: PipeKit pipe => Int -> pipe () Int Empty
 deep_pipe n = iter n (forever skip //) (forever (output 0))
@@ -519,17 +332,14 @@ run "primes1" n = runDirPipe (primes n)
 run "primes2" n = runContPipe (primes n)
 run "primes3" n = runHalfPipe (primes n)
 run "primes4" n = runContPipe (rep (primes n))
-run "primes5" n = runChurchP (primes n)
 
-run "seq1" n = runDirPipe (deep_seq n // take n)
-run "seq2" n = runContPipe (deep_seq n // take n)
-run "seq3" n = runHalfPipe (deep_seq n // take n)
-run "seq4" n = runChurchP (deep_seq n // take n)
+run "seq1" n = runDirPipe (deep_seq n // ContPipe.take n)
+run "seq2" n = runContPipe (deep_seq n // ContPipe.take n)
+run "seq3" n = runHalfPipe (deep_seq n // ContPipe.take n)
 
-run "par1" n = runDirPipe (deep_pipe n // take n)
-run "par2" n = runContPipe (deep_pipe n // take n)
-run "par3" n = runHalfPipe (deep_pipe n // take n)
-run "par4" n = runChurchP (deep_pipe n // take n)
+run "par1" n = runDirPipe (deep_pipe n // ContPipe.take n)
+run "par2" n = runContPipe (deep_pipe n // ContPipe.take n)
+run "par3" n = runHalfPipe (deep_pipe n // ContPipe.take n)
 
 run "rev1" n = runDirPipe rev
 run "rev2" n = runContPipe rev
@@ -537,4 +347,3 @@ run "rev2" n = runContPipe rev
 main =
   do args <- getArgs;
       let n = read (args !! 1) :: Int in run (args !! 0) n
-

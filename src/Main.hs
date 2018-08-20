@@ -33,20 +33,20 @@ main = do
   criterion
 
 criterion = defaultMain
-  [ createBenchPure "pipes" "primes" l1 PipesBench.collectPrimes
-  , createBenchPure "orth-pipes" "primes" l1 OrthPipes.collectPrimes
-  , createBenchPure "orth-pipes-no-unsafe-coerce" "primes" l1 OrthPipesNoUnsafeCoerce.collectPrimes
-  , createBenchPure "orth-pipes-recursive-merge" "primes" (Prelude.take 4 l1) OrthPipesRecursiveMerge.collectPrimes
+  [ createBenchIO "pipes" "primes" l1 PipesBench.runPrimes
+  , createBenchIO "orth-pipes" "primes" l1 OrthPipes.runPrimes
+  , createBenchIO "orth-pipes-no-unsafe-coerce" "primes" l1 OrthPipesNoUnsafeCoerce.runPrimes
+  , createBenchIO "orth-pipes-recursive-merge" "primes" (Prelude.take 4 l1) OrthPipesRecursiveMerge.runPrimes
   , createBenchIO "contpipe" "primes" l1 (ContPipe.run "primes2")
-  , createBenchPure "pipes" "deep-pipe" (Prelude.take 5 l2) PipesBench.deepPipePure
-  , createBenchPure "orth-pipes" "deep-pipe" l2 OrthPipes.deepPipePure
-  , createBenchPure "orth-pipes-no-unsafe-coerce" "deep-pipe" l2 OrthPipesNoUnsafeCoerce.deepPipePure
-  , createBenchPure "orth-pipes-recursive-merge" "deep-pipe" l2 OrthPipesRecursiveMerge.deepPipePure
+  , createBenchIO "pipes" "deep-pipe" (Prelude.take 5 l2) PipesBench.runDeepPipe
+  , createBenchIO "orth-pipes" "deep-pipe" l2 OrthPipes.runDeepPipe
+  , createBenchIO "orth-pipes-no-unsafe-coerce" "deep-pipe" l2 OrthPipesNoUnsafeCoerce.runDeepPipe
+  , createBenchIO "orth-pipes-recursive-merge" "deep-pipe" l2 OrthPipesRecursiveMerge.runDeepPipe
   , createBenchIO "contpipe" "deep-pipe" l2 (ContPipe.run "par2")
-  , createBenchPure "pipes" "deep-seq" (Prelude.take 5 l2) PipesBench.deepSeqPure
-  , createBenchPure "orth-pipes-recursive-merge" "deep-seq" l2 OrthPipesRecursiveMerge.deepSeqPure
-  , createBenchPure "orth-pipes-no-unsafe-coerce" "deep-seq" l2 OrthPipesNoUnsafeCoerce.deepSeqPure
-  , createBenchPure "orth-pipes" "deep-seq" l2 OrthPipes.deepSeqPure
+  , createBenchIO "pipes" "deep-seq" (Prelude.take 5 l2) PipesBench.runDeepSeq
+  , createBenchIO "orth-pipes-recursive-merge" "deep-seq" l2 OrthPipesRecursiveMerge.runDeepSeq
+  , createBenchIO "orth-pipes-no-unsafe-coerce" "deep-seq" l2 OrthPipesNoUnsafeCoerce.runDeepSeq
+  , createBenchIO "orth-pipes" "deep-seq" l2 OrthPipes.runDeepSeq
   , createBenchIO "contpipe" "deep-seq" l2 (ContPipe.run "seq2")
   ]
   where
@@ -61,5 +61,5 @@ createBenchPure groupName benchName ns benchmark =
 createBenchIO groupName benchName ns benchmark =
   bgroup groupName (benchf <$> ns)
   where
-    benchf n = bench (benchName ++ "/" ++ show n) (nfIO (benchmark n))
+    benchf n = bench (benchName ++ "/" ++ show n) (nfAppIO benchmark n)
 
