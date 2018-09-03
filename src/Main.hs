@@ -35,17 +35,11 @@ main = do
 criterion = defaultMain
   [ createBenchIO "pipes" "primes" l1 PipesBench.runPrimes
   , createBenchIO "orth-pipes" "primes" l1 OrthPipes.runPrimes
-  , createBenchIO "orth-pipes-no-unsafe-coerce" "primes" l1 OrthPipesNoUnsafeCoerce.runPrimes
-  , createBenchIO "orth-pipes-recursive-merge" "primes" (Prelude.take 4 l1) OrthPipesRecursiveMerge.runPrimes
   , createBenchIO "contpipe" "primes" l1 (ContPipe.run "primes2")
   , createBenchIO "pipes" "deep-pipe" (Prelude.take 5 l2) PipesBench.runDeepPipe
   , createBenchIO "orth-pipes" "deep-pipe" l2 OrthPipes.runDeepPipe
-  , createBenchIO "orth-pipes-no-unsafe-coerce" "deep-pipe" l2 OrthPipesNoUnsafeCoerce.runDeepPipe
-  , createBenchIO "orth-pipes-recursive-merge" "deep-pipe" l2 OrthPipesRecursiveMerge.runDeepPipe
   , createBenchIO "contpipe" "deep-pipe" l2 (ContPipe.run "par2")
   , createBenchIO "pipes" "deep-seq" (Prelude.take 5 l2) PipesBench.runDeepSeq
-  , createBenchIO "orth-pipes-recursive-merge" "deep-seq" l2 OrthPipesRecursiveMerge.runDeepSeq
-  , createBenchIO "orth-pipes-no-unsafe-coerce" "deep-seq" l2 OrthPipesNoUnsafeCoerce.runDeepSeq
   , createBenchIO "orth-pipes" "deep-seq" l2 OrthPipes.runDeepSeq
   , createBenchIO "contpipe" "deep-seq" l2 (ContPipe.run "seq2")
   ]

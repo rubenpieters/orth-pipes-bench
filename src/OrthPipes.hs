@@ -9,21 +9,16 @@ import Data.Functor.Identity
 import Control.Monad
 import Control.Monad.Trans.Class (MonadTrans (lift))
 
-import Unsafe.Coerce
+newtype PCRep i o a = PCRep { unPCRep :: o -> PCRep o i a -> a }
 
-newtype ReS i o a = ReS { unReS :: (o -> (i -> ReS i o a) -> a) -> a }
-newtype MS m a = MS { unMS :: (m (MS m a) -> a) -> a}
-
-
-newtype Proxy a' a b' b m r = Proxy { unProxy ::
-    (a' -> (a -> ReS a a' (m r)) -> m r) -> -- request
-    (b -> (b' -> ReS b' b (m r)) -> m r) -> -- respond
-    m r ->                            -- exit
-    m r
-  }
+type ProxyRep a' a b' b m r =
+  PCRep a a' (m r) ->  -- request
+  PCRep b' b (m r) ->  -- respond
+  m r ->               -- exit
+  m r
 
 newtype ProxyC a' a b' b m x = ProxyC { unProxyC :: forall r.
-    (x -> Proxy a' a b' b m r) -> Proxy a' a b' b m r
+    (x -> ProxyRep a' a b' b m r) -> ProxyRep a' a b' b m r
   }
 
 instance Functor (ProxyC a' a b' b m) where
@@ -38,62 +33,45 @@ instance Monad (ProxyC a' a b' b m) where
   p >>= f = ProxyC (\k -> unProxyC p (\x -> unProxyC (f x) k))
 
 instance MonadTrans (ProxyC a' a b' b) where
-    lift ma = ProxyC (\k -> Proxy (\req res e ->
+    lift ma = ProxyC (\k req res e ->
       do a <- ma
-         unProxy (k a) req res e
-      ))
+         k a req res e
+      )
 
 yield :: a -> ProxyC x' x a' a m a'
-yield a = ProxyC (\k ->
-  Proxy (\req res e -> res a (\x ->
-    ReS (\res' -> unProxy (k x) req res' e))
-  ))
+yield a = ProxyC (\k req res e ->
+    unPCRep res a (PCRep (\x res' ->
+      k x req res' e
+  )))
 
 request :: a' -> ProxyC a' a y' y m a
-request a' = ProxyC (\k ->
-  Proxy (\req res e -> req a' (\x ->
-    ReS (\req' -> unProxy (k x) req' res e))
-  ))
+request a' = ProxyC (\k req res e ->
+    unPCRep req a' (PCRep (\x req' ->
+      k x req' res e
+  )))
 
 await :: ProxyC () a y' y m a
 await = request ()
 
 exit :: ProxyC a' a b' b m x
-exit = ProxyC (\_ -> Proxy (\_ _ e -> e))
+exit = ProxyC (\_ _ _ e -> e)
 
-mergeLProxy ::
-  (a' -> (a -> ReS a a' (m r)) -> m r) ->
-  m r ->
-  Proxy a' a b' b m r ->
-  ReS b' b (m r)
-mergeLProxy req e p = ReS (\res -> unProxy p req res e)
-
-mergeRProxy ::
-  (b -> (b' -> ReS b' b (m r)) -> m r) ->
-  m r ->
-  Proxy a' a b' b m r ->
-  ReS a a' (m r)
-mergeRProxy res e p = ReS (\req -> unProxy p req res e)
-
-mergeProxy ::
-  (b' -> Proxy a' a b' b m r) ->
-  Proxy b' b c' c m r ->
-  Proxy a' a c' c m r
-mergeProxy fp q = Proxy (\req res e ->
-    mergeReS (mergeRProxy res e q) (mergeLProxy req e . fp)
-  )
-
-mergeReS :: ReS i o a -> (o -> ReS o i a) -> a
-mergeReS = unsafeCoerce
+mergeProxyRep :: (b' -> ProxyRep a' a b' b m r) -> ProxyRep b' b c' c m r -> ProxyRep a' a c' c m r
+mergeProxyRep fb' p req res e = (mergeRR res e p . PCRep) (mergeRL req e . fb')
+  where
+  mergeRL :: PCRep a a' (m r) -> m r -> ProxyRep a' a b' b m r -> (PCRep b' b (m r) -> m r)
+  mergeRL req e proxy res = proxy req res e
+  mergeRR :: PCRep c' c (m r) -> m r -> ProxyRep b' b c' c m r -> (PCRep b b' (m r) -> m r)
+  mergeRR res e proxy req = proxy req res e
 
 (+>>) ::
   (b' -> ProxyC a' a b' b m r) ->
   ProxyC b' b c' c m r ->
   ProxyC a' a c' c m r
 (+>>) fp q =
-  ProxyC (\_ -> mergeProxy
-    ((\p -> unProxyC p (\_ -> Proxy (\_ _ e -> e))) . fp)
-    (unProxyC q (\_ -> Proxy (\_ _ e -> e)))
+  ProxyC (\_ -> mergeProxyRep
+    ((\p -> unProxyC p (\_ _ _ e -> e)) . fp)
+    (unProxyC q (\_ _ _ e -> e))
   )
 
 (>->) ::
@@ -146,16 +124,16 @@ deepPipe n = iter n (forever (return ()) >->) (forever (yield 0))
 deepSeq :: (Monad m) => Int -> Pipe () Int m x
 deepSeq n = iter n (>> forever (return ())) (forever (yield 0))
 
-fixInpSP1 :: ((i -> a) -> a) -> (() -> (i -> ReS i () a) -> a)
-fixInpSP1 inp _ h = inp (\i -> unReS (h i) (fixInpSP1 inp))
+foldInput :: ((i -> a) -> a) -> PCRep i () a
+foldInput inp = PCRep (\_ r -> inp (\i -> unPCRep r i (foldInput inp)))
 
-fixOutSP2 :: (o -> a -> a) -> (o -> (() -> ReS () o a) -> a)
-fixOutSP2 out o h = out o (unReS (h ()) (fixOutSP2 out))
+foldOutput :: (o -> a -> a) -> PCRep () o a
+foldOutput out = PCRep (\o prod -> out o (unPCRep prod () (foldOutput out)))
 
 runPipesIO :: (Read i, Show o) => Pipe i o IO () -> IO ()
-runPipesIO proxyc = unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ -> return ())))
-  (fixInpSP1 (\h -> do x <- readLn; h x))
-  (fixOutSP2 (\o q -> do print o; q))
+runPipesIO proxyc = unProxyC proxyc (\_ _ _ _ -> return ())
+  (foldInput (\h -> do x <- readLn; h x))
+  (foldOutput (\o q -> do print o; q))
   (return ())
 
 runPrimes :: Int -> IO ()
@@ -168,9 +146,9 @@ runDeepSeq :: Int -> IO ()
 runDeepSeq n = runPipesIO (deepSeq n >-> take n)
 
 runPipesCollect :: Pipe () o Identity a -> [o]
-runPipesCollect proxyc = runIdentity $ unProxy (unProxyC proxyc (\_ -> Proxy (\_ _ _ -> return [])))
-  (fixInpSP1 (\h -> h ()))
-  (fixOutSP2 (\o (Identity q) -> return (o : q)))
+runPipesCollect proxyc = runIdentity $ unProxyC proxyc (\_ _ _ _ -> return [])
+  (foldInput (\h -> h ()))
+  (foldOutput (\o (Identity q) -> return (o : q)))
   (return [])
 
 deepPipePure :: Int -> [Int]
