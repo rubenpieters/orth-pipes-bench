@@ -69,6 +69,9 @@ conduitShow = do
 runConduitIO :: (Read i, Show o) => ConduitT i o IO () -> IO ()
 runConduitIO conduit = runConduit (conduitRead .| conduit .| conduitShow)
 
+runConduitCollect :: ConduitT () o Identity () -> [o]
+runConduitCollect p = runConduitPure $ p .| sinkList
+
 runPrimes :: Int -> IO ()
 runPrimes n = runConduitIO (primes n)
 
@@ -80,3 +83,6 @@ runDeepSeq n = runConduitIO (deepSeq n .| ConduitBench.take n)
 
 deepPipePure :: Int -> [Int]
 deepPipePure n = runConduitPure (deepSeq n .| ConduitBench.take n .| sinkList)
+
+collectPrimes :: Int -> [Int]
+collectPrimes n = runConduitCollect (primes n)
