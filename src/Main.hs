@@ -4,6 +4,7 @@ import PipesBench
 import ConduitBench
 import OrthPipes
 import qualified ContPipe
+import qualified ContPipeR
 
 import Criterion.Main
 
@@ -17,7 +18,8 @@ test :: IO ()
 test = do
   check "pipes" PipesBench.collectPrimes
   check "conduit" ConduitBench.collectPrimes
-  check "orth-pipes" OrthPipes.collectPrimes
+  check "proxyrep" OrthPipes.collectPrimes
+  check "contpiper" ContPipeR.collectPrimes
 
 check str f = if primesL testN == f testN
   then return ()
@@ -47,6 +49,15 @@ criterion = defaultMain
   where
     l1 = [1, 1000, 2500, 5000, 7500, 10000]
     l2 = [1, 1000, 2500, 5000, 7500, 10000, 25000, 50000, 75000, 100000, 250000, 500000]
+
+criterion2 = defaultMain
+  [ createBenchIO "proxyrep" "primes" l1 OrthPipes.runPrimes
+  , createBenchIO "contpiper" "primes" l1 ContPipeR.runPrimes
+  , createBenchIO "contpipe" "primes" l1 (ContPipe.run "primes2")
+  ]
+  where
+    l1 = [1, 1000, 2500, 5000, 7500]
+
 
 createBenchPure groupName benchName ns benchmark =
   bgroup groupName (benchf <$> ns)
