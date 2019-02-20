@@ -13,12 +13,75 @@ build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md
 
-executable orth-pipes-bench
+Library
   hs-source-dirs:      src
+  default-language:    Haskell2010
+  exposed-modules:     PipesBench
+                     , ConduitBench
+                     , OrthPipes
+                     , ContPipe
+                     , ContPipeR
+  build-depends:       base == 4.11.1.0
+                     , pipes == 4.3.9
+                     , transformers == 0.5.5.0
+                     , criterion == 1.5.1.0
+                     , conduit == 1.3.0.3
+
+
+executable bench-spivey
+  hs-source-dirs:      src-spivey
   main-is:             Main.hs
+  ghc-options:         -O2
   default-language:    Haskell2010
   build-depends:       base == 4.11.1.0
                      , pipes == 4.3.9
                      , transformers == 0.5.5.0
                      , criterion == 1.5.1.0
                      , conduit == 1.3.0.3
+                     , orth-pipes-bench
+
+executable bench-yahoo
+  hs-source-dirs:      src-yahoo
+  main-is:             Main.hs
+  ghc-options:         -O2
+  default-language:    Haskell2010
+  other-modules:       Insert
+                     , EventRecord
+  build-depends:       base == 4.11.1.0
+                     , pipes == 4.3.9
+                     , transformers == 0.5.5.0
+                     , criterion == 1.5.1.0
+                     , conduit == 1.3.0.3
+                     , orth-pipes-bench
+                     , hw-kafka-client
+                     , text
+                     , bytestring
+                     , containers
+                     , aeson
+                     , hedis
+                     , uuid
+                     , unix-time
+                     , QuickCheck
+
+executable insert-yahoo
+  hs-source-dirs:      src-yahoo
+  main-is:             Insert.hs
+  ghc-options:         -O2 -main-is Insert
+  default-language:    Haskell2010
+  other-modules:       Main
+                     , EventRecord
+  build-depends:       base == 4.11.1.0
+                     , pipes == 4.3.9
+                     , transformers == 0.5.5.0
+                     , criterion == 1.5.1.0
+                     , conduit == 1.3.0.3
+                     , orth-pipes-bench
+                     , hw-kafka-client
+                     , text
+                     , bytestring
+                     , containers
+                     , aeson
+                     , hedis
+                     , uuid
+                     , unix-time
+                     , QuickCheck

@@ -39,7 +39,10 @@ packages:
 - .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps: [
+  hw-kafka-client-2.6.0
+, hedis-0.12.0
+]
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
@@ -59,8 +62,8 @@ packages:
 # arch: x86_64
 #
 # Extra directories used by stack for building
-# extra-include-dirs: [/path/to/dir]
-# extra-lib-dirs: [/path/to/dir]
+extra-include-dirs: [/usr/local/lib]
+extra-lib-dirs: [/usr/local/lib]
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
