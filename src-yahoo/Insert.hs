@@ -22,7 +22,7 @@ genEventRecord = do
   page_id <- create "page_id" [1..100]
   ad_id <- create "aid_" [1..100]
   ad_type <- oneof (return <$> ["banner", "modal", "sponsored-search", "mail", "mobile"])
-  event_type <- oneof (return <$> ["view", "click", "purchase"])
+  event_type <- return "view" -- oneof (return <$> ["view", "click", "purchase"])
   event_time <- show <$> choose (1 :: Int, 1000000)
   ip_address <- create "ip_address" [1..100]
   return (EventRecord user_id page_id ad_id ad_type event_type event_time ip_address)
