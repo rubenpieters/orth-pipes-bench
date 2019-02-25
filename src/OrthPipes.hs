@@ -187,6 +187,17 @@ mapM f = forever $ do
 each :: Foldable f => f a -> ProxyC x' x () a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 
+unfoldr :: Monad m 
+  => (s -> m (Either r (a, s))) -> s -> ProxyC x' x () a m r
+unfoldr step = go where
+  go s0 = do
+    e <- lift (step s0)
+    case e of
+      Left r -> return r
+      Right (a,s) -> do 
+        yield a
+        go s
+
 concat :: Foldable f => ProxyC () (f a) () a m ()
 concat = do
   fa <- await
@@ -214,3 +225,14 @@ foldResponsesPr combine b proxy = foldProxyRep
 
 construct :: ProxyC a' a b' b m x -> ProxyRep a' a b' b m
 construct (ProxyC plan) = plan (\_ _ _ e -> e)
+
+source :: Monad m => Int -> Int -> ProxyC x' x () Int m ()
+source from to = unfoldr step from
+    where
+    step cnt =
+        if cnt > to
+        then return (Left ())
+        else return (Right (cnt, cnt + 1))
+
+mapBench :: Monad m => Int -> m () 
+mapBench n = runEffectPr $ construct $ source 0 n >-> map (+1) >-> forever await
