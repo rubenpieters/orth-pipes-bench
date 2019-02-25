@@ -4,6 +4,7 @@ module PipesBench where
 
 import Data.Functor.Identity
 import Pipes
+import qualified Pipes.Prelude as P
 import Control.Monad (forever)
 import Pipes.Internal
 
@@ -76,3 +77,14 @@ deepSeqPure n = runPipesCollect (deepSeq n >-> PipesBench.take n)
 
 collectPrimes :: Int -> [Int]
 collectPrimes n = runPipesCollect (primes n)
+
+source :: Monad m => Int -> Int -> Producer Int m ()
+source from to = P.unfoldr step from
+    where
+    step cnt =
+        if cnt > to
+        then return (Left ())
+        else return (Right (cnt, cnt + 1))
+
+mapBench :: Monad m => Int -> m () 
+mapBench n = runEffect (source 0 n >-> P.map (+1) >-> forever await)

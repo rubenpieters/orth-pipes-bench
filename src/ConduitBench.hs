@@ -3,6 +3,8 @@ module ConduitBench where
 import Control.Monad
 
 import Conduit
+import Data.Conduit.List as C hiding (sinkNull, map)
+import Data.Conduit.Combinators as C hiding (print)
 
 upfrom :: (Monad m) => Int -> ConduitT x Int m b
 upfrom n = do
@@ -86,3 +88,14 @@ deepPipePure n = runConduitPure (deepSeq n .| ConduitBench.take n .| sinkList)
 
 collectPrimes :: Int -> [Int]
 collectPrimes n = runConduitCollect (primes n)
+
+source :: Monad m => Int -> Int -> ConduitT () Int m ()
+source from to = C.unfoldM step from
+    where
+    step cnt =
+        if cnt > to
+        then return Nothing
+        else return (Just (cnt, cnt + 1))
+
+mapBench :: Monad m => Int -> m () 
+mapBench n = runConduit (source 0 n .| C.map (+1) .| C.sinkNull)
