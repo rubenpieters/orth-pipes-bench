@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module OrthPipes where
+module Representations.OrthPipes where
 
 import Prelude hiding (filter, map, drop, take)
 
@@ -226,6 +226,7 @@ foldResponsesPr combine b proxy = foldProxyRep
 construct :: ProxyC a' a b' b m x -> ProxyRep a' a b' b m
 construct (ProxyC plan) = plan (\_ _ _ e -> e)
 
+{-# INLINE source #-}
 source :: Monad m => Int -> Int -> ProxyC x' x () Int m ()
 source from to = unfoldr step from
     where
@@ -234,5 +235,6 @@ source from to = unfoldr step from
         then return (Left ())
         else return (Right (cnt, cnt + 1))
 
+{-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m () 
 mapBench n = runEffectPr $ construct $ source 0 n >-> map (+1) >-> forever await

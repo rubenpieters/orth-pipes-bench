@@ -6,7 +6,7 @@
 -- FlexibleInstances for the instance Monad_f m => Monad (m i o)
 -- Rank2Types for the Codensity stuff
 
-module ContPipe where
+module Representations.ContPipe where
 
 import Prelude hiding (map, filter, take)
 import qualified Data.List as List
@@ -294,10 +294,10 @@ map f = forever (do x <- input; output (f x))
 
 sieve :: PipeKit pipe => pipe Int Int Empty
 sieve =
-  do p <- input; output p; (ContPipe.filter (\ x -> x `mod` p /= 0)) // sieve
+  do p <- input; output p; (filter (\ x -> x `mod` p /= 0)) // sieve
 
 primes :: PipeKit pipe => Int -> pipe () Int Empty
-primes n = upfrom 2 // sieve // ContPipe.take n
+primes n = upfrom 2 // sieve // take n
 
 readLine :: PipeKit pipe => pipe u String ()
 readLine = do s <- effect (do putStr "> "; hFlush stdout; getLine); output s
@@ -307,7 +307,7 @@ putLine = do s <- input; effect (putStrLn s)
 
 rev :: PipeKit pipe => pipe () () ()
 rev =
-  forever readLine // ContPipe.map reverse // forever putLine
+  forever readLine // map reverse // forever putLine
 
 deep_pipe :: PipeKit pipe => Int -> pipe () Int Empty
 deep_pipe n = iter n (forever skip //) (forever (output 0))
@@ -333,13 +333,13 @@ run "primes2" n = runContPipe (primes n)
 run "primes3" n = runHalfPipe (primes n)
 run "primes4" n = runContPipe (rep (primes n))
 
-run "seq1" n = runDirPipe (deep_seq n // ContPipe.take n)
-run "seq2" n = runContPipe (deep_seq n // ContPipe.take n)
-run "seq3" n = runHalfPipe (deep_seq n // ContPipe.take n)
+run "seq1" n = runDirPipe (deep_seq n // take n)
+run "seq2" n = runContPipe (deep_seq n // take n)
+run "seq3" n = runHalfPipe (deep_seq n // take n)
 
-run "par1" n = runDirPipe (deep_pipe n // ContPipe.take n)
-run "par2" n = runContPipe (deep_pipe n // ContPipe.take n)
-run "par3" n = runHalfPipe (deep_pipe n // ContPipe.take n)
+run "par1" n = runDirPipe (deep_pipe n // take n)
+run "par2" n = runContPipe (deep_pipe n // take n)
+run "par3" n = runHalfPipe (deep_pipe n // take n)
 
 run "rev1" n = runDirPipe rev
 run "rev2" n = runContPipe rev

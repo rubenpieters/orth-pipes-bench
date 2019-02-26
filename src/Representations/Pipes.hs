@@ -1,6 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+module Representations.Pipes where
 
-module PipesBench where
+import Prelude hiding (filter, map, drop, take)
 
 import Data.Functor.Identity
 import Pipes
@@ -27,16 +27,16 @@ take n = if n == 0
   else do
     x <- await
     yield x
-    PipesBench.take (n - 1)
+    take (n - 1)
 
 sieve :: (Monad m) => Pipe Int Int m x
 sieve = do
   p <- await
   yield p
-  PipesBench.filter (\x -> x `mod` p /= 0) >-> sieve
+  filter (\x -> x `mod` p /= 0) >-> sieve
 
 primes :: (Monad m) => Int -> Pipe () Int m ()
-primes n = upfrom 2 >-> sieve >-> PipesBench.take n
+primes n = upfrom 2 >-> sieve >-> take n
 
 iter :: Int -> (a -> a) -> a -> a
 iter n f x = loop n x where
@@ -58,10 +58,10 @@ runPrimes :: Int -> IO ()
 runPrimes n = runPipesIO (primes n)
 
 runDeepPipe :: Int -> IO ()
-runDeepPipe n = runPipesIO (deepPipe n >-> PipesBench.take n)
+runDeepPipe n = runPipesIO (deepPipe n >-> take n)
 
 runDeepSeq :: Int -> IO ()
-runDeepSeq n = runPipesIO (deepSeq n >-> PipesBench.take n)
+runDeepSeq n = runPipesIO (deepSeq n >-> take n)
 
 runPipesCollect :: Pipe () o Identity a -> [o]
 runPipesCollect (Request _ h) = runPipesCollect (h ())
@@ -70,14 +70,15 @@ runPipesCollect (M e) = runPipesCollect (runIdentity e)
 runPipesCollect (Pure _) = []
 
 deepPipePure :: Int -> [Int]
-deepPipePure n = runPipesCollect (deepPipe n >-> PipesBench.take n)
+deepPipePure n = runPipesCollect (deepPipe n >-> take n)
 
 deepSeqPure :: Int -> [Int]
-deepSeqPure n = runPipesCollect (deepSeq n >-> PipesBench.take n)
+deepSeqPure n = runPipesCollect (deepSeq n >-> take n)
 
 collectPrimes :: Int -> [Int]
 collectPrimes n = runPipesCollect (primes n)
 
+{-# INLINE source #-}
 source :: Monad m => Int -> Int -> Producer Int m ()
 source from to = P.unfoldr step from
     where
@@ -86,5 +87,6 @@ source from to = P.unfoldr step from
         then return (Left ())
         else return (Right (cnt, cnt + 1))
 
+{-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m () 
 mapBench n = runEffect (source 0 n >-> P.map (+1) >-> forever await)

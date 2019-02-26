@@ -1,4 +1,6 @@
-module StreamlyBench where
+{-# LANGUAGE FlexibleContexts #-}
+
+module Representations.Streamly where
 
 import Data.Functor.Identity
 import Streamly
@@ -28,3 +30,16 @@ collectPrimes n = runIdentity $ S.toList $ primes n
 
 runPrimes :: Int -> IO ()
 runPrimes n = S.mapM_ (\n -> print n) (primes n)
+
+{-# INLINE source #-}
+source :: MonadAsync m => Int -> Int -> SerialT m Int
+source from to = S.unfoldrM step from
+    where
+    step cnt =
+        if cnt > to
+        then return Nothing
+        else return (Just (cnt, cnt + 1))
+
+{-# INLINE mapBench #-}
+mapBench :: MonadAsync m => Int -> m () 
+mapBench n = runStream (source 0 n & S.map (+1))

@@ -16,12 +16,15 @@ extra-source-files:  README.md
 Library
   hs-source-dirs:      src
   default-language:    Haskell2010
-  exposed-modules:     PipesBench
-                     , ConduitBench
-                     , StreamlyBench
-                     , OrthPipes
-                     , ContPipe
-                     , ContPipeR
+  ghc-options:         -O2
+  exposed-modules:     Representations.Pipes
+                     , Representations.Conduit
+                     , Representations.Streamly
+                     , Representations.OrthPipes
+                     , Representations.ContPipe
+                     , Benchmarks.Common
+                     , Benchmarks.Micro
+                     , Benchmarks.Spivey
   build-depends:       base == 4.11.1.0
                      , pipes == 4.3.9
                      , transformers == 0.5.5.0
@@ -31,10 +34,16 @@ Library
 
 
 executable bench-spivey
-  hs-source-dirs:      src-spivey
-  main-is:             Main.hs
-  ghc-options:         -O2
+  hs-source-dirs:      src
+  main-is:             Benchmarks/Spivey.hs
+  ghc-options:         -O2 -main-is Benchmarks.Spivey
   default-language:    Haskell2010
+  other-modules:       Representations.Pipes
+                     , Representations.Conduit
+                     , Representations.Streamly
+                     , Representations.OrthPipes
+                     , Representations.ContPipe
+                     , Benchmarks.Common
   build-depends:       base == 4.11.1.0
                      , pipes == 4.3.9
                      , transformers == 0.5.5.0
@@ -44,10 +53,16 @@ executable bench-spivey
                      , orth-pipes-bench
 
 executable bench-micro
-  hs-source-dirs:      src-micro
-  main-is:             Main.hs
-  ghc-options:         -O2
+  hs-source-dirs:      src
+  main-is:             Benchmarks/Micro.hs
+  ghc-options:         -O2 -main-is Benchmarks.Micro
   default-language:    Haskell2010
+  other-modules:       Representations.Pipes
+                     , Representations.Conduit
+                     , Representations.Streamly
+                     , Representations.OrthPipes
+                     , Representations.ContPipe
+                     , Benchmarks.Common
   build-depends:       base == 4.11.1.0
                      , pipes == 4.3.9
                      , transformers == 0.5.5.0
@@ -58,8 +73,8 @@ executable bench-micro
 
 executable bench-yahoo
   hs-source-dirs:      src-yahoo
-  main-is:             Main.hs
-  ghc-options:         -O2
+  main-is:             Bench.hs
+  ghc-options:         -O2 -main-is Bench
   default-language:    Haskell2010
   other-modules:       Insert
                      , EventRecord
