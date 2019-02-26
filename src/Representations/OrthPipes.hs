@@ -48,24 +48,29 @@ instance (MonadIO m) => MonadIO (ProxyC a' a b' b m) where
       k a req res e
     )
 
+{-# INLINE yield #-}
 yield :: a -> ProxyC x' x a' a m a'
 yield a = ProxyC (\k req res e ->
     unPCRep res a (PCRep (\x res' ->
       k x req res' e
   )))
 
+{-# INLINE request #-}
 request :: a' -> ProxyC a' a y' y m a
 request a' = ProxyC (\k req res e ->
     unPCRep req a' (PCRep (\x req' ->
       k x req' res e
   )))
 
+{-# INLINE await #-}
 await :: ProxyC () a y' y m a
 await = request ()
 
+{-# INLINE exit #-}
 exit :: ProxyC a' a b' b m x
 exit = ProxyC (\_ _ _ e -> e)
 
+{-# INLINE mergeProxyRep #-}
 mergeProxyRep :: (b' -> ProxyRep a' a b' b m) -> ProxyRep b' b c' c m -> ProxyRep a' a c' c m
 mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res e
 {-mergeProxyRep fb' p req res e = (mergeRR res e p . PCRep) (mergeRL req e . fb')
@@ -76,6 +81,7 @@ mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res 
   mergeRR res e proxy req = proxy req res e
 -}
 
+{-# INLINE (+>>) #-}
 (+>>) ::
   (b' -> ProxyC a' a b' b m r) ->
   ProxyC b' b c' c m r ->
@@ -86,6 +92,7 @@ mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res 
     (unProxyC q (\_ _ _ e -> e))
   )
 
+{-# INLINE (>->) #-}
 (>->) ::
   ProxyC a' a () b m r ->
   ProxyC () b c' c m r ->
@@ -173,20 +180,24 @@ deepSeqPure n = runPipesCollect (deepSeq n >-> take n)
 collectPrimes :: Int -> [Int]
 collectPrimes n = runPipesCollect (primes n)
 
+{-# INLINE map #-}
 map :: (a -> b) -> ProxyC () a () b m r
 map f = forever $ do
   x <- await
   yield (f x)
 
+{-# INLINE mapM #-}
 mapM :: Monad m => (a -> m b) -> ProxyC () a () b m r
 mapM f = forever $ do
   x <- await
   b <- lift (f x)
   yield b
 
+{-# INLINE each #-}
 each :: Foldable f => f a -> ProxyC x' x () a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 
+{-# INLINE unfoldr #-}
 unfoldr :: Monad m 
   => (s -> m (Either r (a, s))) -> s -> ProxyC x' x () a m r
 unfoldr step = go where
@@ -198,11 +209,13 @@ unfoldr step = go where
         yield a
         go s
 
+{-# INLINE concat #-}
 concat :: Foldable f => ProxyC () (f a) () a m ()
 concat = do
   fa <- await
   each fa
 
+{-# INLINE foldProxyRep #-}
 foldProxyRep ::
   (a' -> (a -> (m r)) -> (m r)) ->
   (b -> (b' -> (m r)) -> (m r)) ->
