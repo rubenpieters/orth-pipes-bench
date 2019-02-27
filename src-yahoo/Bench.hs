@@ -4,13 +4,17 @@
 module Bench where
 
 import EventRecord
+import qualified Insert
 
 import Control.Monad
+import Control.Monad.Trans.Class (MonadTrans)
 import Data.Monoid
+import Data.Function ((&))
 import Data.ByteString       (ByteString)
 import Data.ByteString.Lazy  (toStrict)
 import Data.ByteString.Char8 (pack, unpack)
 import Data.Text (Text)
+import qualified Data.Text as Text (pack, unpack)
 import Kafka.Consumer as KC
 import Data.Map              (Map)
 import qualified Data.Map.Strict as M
@@ -27,6 +31,13 @@ import qualified Pipes as P
 import qualified Pipes.Prelude as P
 import qualified Conduit as C
 import qualified Representations.OrthPipes as O
+import qualified Streamly as S
+import qualified Streamly.Prelude as S
+import System.Random
+
+import Benchmarks.Common
+
+import Criterion.Main
 
 -- src/redis-server
 
@@ -34,14 +45,68 @@ import qualified Representations.OrthPipes as O
 -- bin/kafka-server-start.sh config/server.properties
 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ad-events --from-beginning
 
-main = run conduitCode
+{-
+main :: IO ()
+main = do
+  run code 20
+  where 
+    code :: Int -> KafkaConsumer -> R.Connection -> IO ()
+    code n kafkaConsumer redisConnection = do
+      list <- P.toListM $
+        pipesConsumer kafkaConsumer P.>->
+        P.map crValue P.>->
+        P.map parseJson P.>->
+        P.concat P.>->
+        P.filter viewFilter P.>->
+        P.take 20
+      mapM_ print list
+-}
+
+{-
+main :: IO ()
+main = do
+  run code 20
+  where 
+    code :: Int -> KafkaConsumer -> R.Connection -> IO ()
+    code n kafkaConsumer redisConnection = do
+      list <- S.toList $
+        streamlyConsumer kafkaConsumer
+        & S.map crValue
+        & S.map parseJson
+        & S.concatMap concatHelper
+        & S.filter viewFilter
+        & S.take 20
+      mapM_ print list
+    concatHelper (Just x) = S.yield x
+    concatHelper Nothing = S.nil
+-}
+
+main = run streamlyCode 10000
+
+--main = do
+--  Insert.main
+--  criterion
+
+criterion = defaultMain
+  [ createBenchIO "pipes" "adevents" l1 (run pipesCode)
+  , createBenchIO "proxyrep" "adevents" l1 (run orthCode)
+  , createBenchIO "conduit" "adevents" l1 (run conduitCode)
+  --, createBenchIO "streamly" "adevents" l1 (run streamlyCode)
+  ]
+  where
+    l1 = [1, 5000, 10000]
 
 -- consumer configuration
-consumerProps :: ConsumerProperties
-consumerProps = KC.brokersList [BrokerAddress "localhost:9092"]
-             <> groupId (ConsumerGroupId "consumer-id")
+consumerProps :: Int -> ConsumerProperties
+consumerProps x = KC.brokersList [BrokerAddress "localhost:9092"]
+             <> groupId (ConsumerGroupId ("consumer-id-" <> padded x))
              -- prevent auto commit, so group id can be reused
              <> noAutoCommit
+  where
+    padded :: Int -> Text
+    padded x =
+      Text.pack (replicate (6 - length (show x)) '0') <>
+      Text.pack (show x)
 
 consumerSub :: Subscription
 consumerSub = topics [TopicName "ad-events"]
@@ -49,17 +114,19 @@ consumerSub = topics [TopicName "ad-events"]
           <> offsetReset Earliest
 
 mkConsumer :: IO (Either KafkaError KafkaConsumer)
-mkConsumer = newConsumer consumerProps consumerSub
+mkConsumer = do
+  x <- randomRIO (1, 999999)
+  newConsumer (consumerProps x) consumerSub
 
 -- NOTE: nicely closing consumers should normally be done with some kind of 'bracket' function
-run :: (KafkaConsumer -> R.Connection -> IO ()) -> IO ()
-run code = do
+run :: (Int -> KafkaConsumer -> R.Connection -> IO ()) -> Int -> IO ()
+run code n = do
   eKafkaConsumer <- mkConsumer
   redisConnection <- R.checkedConnect R.defaultConnectInfo
   case eKafkaConsumer of
     Left err -> putStrLn (show err)
     Right kafkaConsumer -> do
-      code kafkaConsumer redisConnection
+      code n kafkaConsumer redisConnection
       closeConsumer kafkaConsumer
       R.disconnect redisConnection
 
@@ -117,11 +184,6 @@ writeRedis conn ((campaign_id, window_time), count) = liftIO $ R.runRedis conn $
 
 -- Pipes Code
 
-pipesCountByKey :: (Monad m) => P.Producer (String, Int) m () -> P.Producer ((String, Int), Int) m ()
-pipesCountByKey prod = do
-  resultMap <- lift $ P.fold (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty id prod
-  P.each (M.toList resultMap)
-
 pipesConsumer :: (MonadIO m) => KafkaConsumer -> P.Producer (ConsumerRecord (Maybe ByteString) (Maybe ByteString)) m ()
 pipesConsumer kafkaConsumer = forever $ do
   eMsg <- liftIO (pollMessage kafkaConsumer (Timeout 1000))
@@ -129,8 +191,13 @@ pipesConsumer kafkaConsumer = forever $ do
     Left err -> liftIO (putStrLn (show err))
     Right msg -> P.yield msg
 
-pipesCode :: KafkaConsumer -> R.Connection -> IO ()
-pipesCode kafkaConsumer redisConnection = P.runEffect $
+pipesCountByKey :: (Monad m) => P.Producer (String, Int) m () -> P.Producer ((String, Int), Int) m ()
+pipesCountByKey prod = do
+  resultMap <- lift $ P.fold (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty id prod
+  P.each (M.toList resultMap)
+
+pipesCode :: Int -> KafkaConsumer -> R.Connection -> IO ()
+pipesCode n kafkaConsumer redisConnection = P.runEffect $
   (pipesCountByKey (pipesConsumer kafkaConsumer P.>->
     P.map crValue P.>->
     P.map parseJson P.>->
@@ -139,7 +206,7 @@ pipesCode kafkaConsumer redisConnection = P.runEffect $
     P.map eventProjection P.>->
     P.mapM (queryRedis redisConnection) P.>->
     P.map campaignTime P.>->
-    P.take 10000
+    P.take n
   )) P.>-> P.mapM (writeRedis redisConnection) P.>-> forever P.await
 
 -- Conduit Code
@@ -156,8 +223,8 @@ conduitCountByKey prod = do
   resultMap <- lift $ C.runConduit $ prod C..| C.foldl (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty
   C.yieldMany (M.toList resultMap)
 
-conduitCode :: KafkaConsumer -> R.Connection -> IO ()
-conduitCode kafkaConsumer redisConnection = C.runConduit $
+conduitCode :: Int -> KafkaConsumer -> R.Connection -> IO ()
+conduitCode n kafkaConsumer redisConnection = C.runConduit $
   (conduitCountByKey (conduitConsumer kafkaConsumer C..|
     C.map crValue C..|
     C.map parseJson C..|
@@ -166,7 +233,7 @@ conduitCode kafkaConsumer redisConnection = C.runConduit $
     C.map eventProjection C..|
     C.mapM (queryRedis redisConnection) C..|
     C.map campaignTime C..|
-    C.take 10000
+    C.take n
   )) C..| C.mapM (writeRedis redisConnection) C..| C.sinkNull
 
 -- Orthogonal Pipes Code
@@ -178,14 +245,13 @@ orthConsumer kafkaConsumer = forever $ do
     Left err -> liftIO (putStrLn (show err))
     Right msg -> O.yield msg
 
-
 orthCountByKey :: (Monad m) => O.Producer (String, Int) m () -> O.Producer ((String, Int), Int) m ()
 orthCountByKey prod = do
   resultMap <- lift $ O.foldResponsesPr (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty (O.construct prod)
   O.each (M.toList resultMap)
 
-orthCode :: KafkaConsumer -> R.Connection -> IO ()
-orthCode kafkaConsumer redisConnection = O.runEffectPr $ O.construct $
+orthCode :: Int -> KafkaConsumer -> R.Connection -> IO ()
+orthCode n kafkaConsumer redisConnection = O.runEffectPr $ O.construct $
   (orthCountByKey (orthConsumer kafkaConsumer O.>->
     O.map crValue O.>->
     O.map parseJson O.>->
@@ -194,5 +260,37 @@ orthCode kafkaConsumer redisConnection = O.runEffectPr $ O.construct $
     O.map eventProjection O.>->
     O.mapM (queryRedis redisConnection) O.>->
     O.map campaignTime O.>->
-    O.take 10000
+    O.take n
   )) O.>-> O.mapM (writeRedis redisConnection) O.>-> forever O.await
+
+-- Streamly Code
+
+streamlyConsumer :: (MonadIO (t m), S.IsStream t) => KafkaConsumer -> t m (ConsumerRecord (Maybe ByteString) (Maybe ByteString))
+streamlyConsumer kafkaConsumer = do
+  eMsg <- liftIO (pollMessage kafkaConsumer (Timeout 1000))
+  case eMsg of
+    Left err -> do
+      liftIO (putStrLn (show err))
+      streamlyConsumer kafkaConsumer
+    Right msg -> msg `S.cons` streamlyConsumer kafkaConsumer
+
+streamlyCountByKey :: (MonadIO (t m), S.IsStream t, MonadTrans t, Monad m) => S.SerialT m (String, Int) -> t m ((String, Int), Int)
+streamlyCountByKey prod = do
+  resultMap <- lift $ S.foldx (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty id prod
+  S.fromFoldable (M.toList resultMap)
+
+streamlyCode :: Int -> KafkaConsumer -> R.Connection -> IO ()
+streamlyCode n kafkaConsumer redisConnection = S.runStream $
+  streamlyCountByKey (streamlyConsumer kafkaConsumer
+      & S.map crValue
+      & S.map parseJson
+      & S.concatMap concatHelper
+      & S.filter viewFilter
+      & S.map eventProjection
+      & S.mapM (queryRedis redisConnection)
+      & S.map campaignTime
+      & S.take n
+    ) & S.mapM (writeRedis redisConnection)
+  where
+    concatHelper (Just x) = S.yield x
+    concatHelper Nothing = S.nil

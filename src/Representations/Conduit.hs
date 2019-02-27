@@ -100,7 +100,6 @@ source from to = C.unfoldM step from
         then return Nothing
         else return (Just (cnt, cnt + 1))
 
-
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m () 
 mapBench n = runConduit (source 0 n .| C.map (+1) .| C.sinkNull)
