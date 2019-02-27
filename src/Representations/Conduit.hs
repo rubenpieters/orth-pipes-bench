@@ -5,7 +5,7 @@ import Prelude hiding (filter, map, drop, take)
 import Control.Monad
 
 import Conduit
-import Data.Conduit.List as C hiding (sinkNull, map, take, filter)
+import Data.Conduit.List as C hiding (sinkNull, map, take, filter, mapM, concat)
 import Data.Conduit.Combinators as C hiding (print, take, filter)
 
 upfrom :: (Monad m) => Int -> ConduitT x Int m b
@@ -103,3 +103,15 @@ source from to = C.unfoldM step from
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m () 
 mapBench n = runConduit (source 0 n .| C.map (+1) .| C.sinkNull)
+
+{-# INLINE mapMBench #-}
+mapMBench :: Monad m => Int -> m () 
+mapMBench n = runConduit (source 0 n .| C.mapM return .| C.sinkNull)
+
+{-# INLINE filterBench #-}
+filterBench :: Monad m => Int -> m () 
+filterBench n = runConduit (source 0 n .| filter even .| C.sinkNull)
+
+{-# INLINE concatBench #-}
+concatBench :: Monad m => Int -> m () 
+concatBench n = runConduit (source 0 n .| C.map (Prelude.replicate 3) .| C.concat .| C.sinkNull)

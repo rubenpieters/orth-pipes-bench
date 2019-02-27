@@ -4,12 +4,12 @@
 
 module Representations.OrthPipes where
 
-import Prelude hiding (filter, map, drop, take)
+import Prelude hiding (filter, map, drop, take, mapM, concat)
 
-import Control.Monad
+import Control.Monad (forever, ap, liftM)
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Foldable as F
+import qualified Data.Foldable as F
 import Data.Functor.Identity
 import Data.Void
 
@@ -251,3 +251,15 @@ source from to = unfoldr step from
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m () 
 mapBench n = runEffectPr $ construct $ source 0 n >-> map (+1) >-> forever await
+
+{-# INLINE mapMBench #-}
+mapMBench :: Monad m => Int -> m () 
+mapMBench n = runEffectPr $ construct $ source 0 n >-> mapM return >-> forever await
+
+{-# INLINE filterBench #-}
+filterBench :: Monad m => Int -> m () 
+filterBench n = runEffectPr $ construct $ source 0 n >-> filter even >-> forever await
+
+{-# INLINE concatBench #-}
+concatBench :: Monad m => Int -> m () 
+concatBench n = runEffectPr $ construct $ source 0 n >-> map (Prelude.replicate 3) >-> concat >-> forever await
