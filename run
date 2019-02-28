@@ -1,7 +1,0 @@
-rm -f plot/bench.csv
-stack build --ghc-options -O2
-stack exec bench-spivey -- --csv plot/bench.csv >/dev/null
-python plot/transform.py
-gnuplot plot/plot.gnu
-gnuplot plot/plot_pipe.gnu
-gnuplot plot/plot_seq.gnu
