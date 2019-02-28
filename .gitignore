@@ -6,3 +6,6 @@ dist
 plot/*.csv
 plot/*.tmp
 benchmark*.eps
+results-spivey/
+results-micro/
+results-yahoo/

@@ -45,56 +45,18 @@ import Criterion.Main
 -- bin/kafka-server-start.sh config/server.properties
 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ad-events --from-beginning
 
-{-
-main :: IO ()
 main = do
-  run code 20
-  where 
-    code :: Int -> KafkaConsumer -> R.Connection -> IO ()
-    code n kafkaConsumer redisConnection = do
-      list <- P.toListM $
-        pipesConsumer kafkaConsumer P.>->
-        P.map crValue P.>->
-        P.map parseJson P.>->
-        P.concat P.>->
-        P.filter viewFilter P.>->
-        P.take 20
-      mapM_ print list
--}
-
-{-
-main :: IO ()
-main = do
-  run code 20
-  where 
-    code :: Int -> KafkaConsumer -> R.Connection -> IO ()
-    code n kafkaConsumer redisConnection = do
-      list <- S.toList $
-        streamlyConsumer kafkaConsumer
-        & S.map crValue
-        & S.map parseJson
-        & S.concatMap concatHelper
-        & S.filter viewFilter
-        & S.take 20
-      mapM_ print list
-    concatHelper (Just x) = S.yield x
-    concatHelper Nothing = S.nil
--}
-
-main = run streamlyCode 10000
-
---main = do
---  Insert.main
---  criterion
+  Insert.main
+  criterion
 
 criterion = defaultMain
   [ createBenchIO "pipes" "adevents" l1 (run pipesCode)
   , createBenchIO "proxyrep" "adevents" l1 (run orthCode)
   , createBenchIO "conduit" "adevents" l1 (run conduitCode)
-  --, createBenchIO "streamly" "adevents" l1 (run streamlyCode)
+  , createBenchIO "streamly" "adevents" l1 (run streamlyCode)
   ]
   where
-    l1 = [1, 5000, 10000]
+    l1 = [1, 5000, 10000, 50000, 100000, 500000, 1000000]
 
 -- consumer configuration
 consumerProps :: Int -> ConsumerProperties

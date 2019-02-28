@@ -1,0 +1,18 @@
+# create results folder if not present
+mkdir results-micro
+
+# remove old csv
+rm -f results-micro/bench.csv
+
+# compile and run benchmark
+stack build
+stack exec bench-micro -- --csv plot/bench.csv >/dev/null
+
+# transform criterion results
+python scripts/transform.py results-micro
+
+# create plots
+gnuplot scripts/plot_micro_concat.gnu
+gnuplot scripts/plot_micro_filter.gnu
+gnuplot scripts/plot_micro_map.gnu
+gnuplot scripts/plot_micro_mapM.gnu

@@ -1,0 +1,17 @@
+# create results folder if not present
+mkdir results-spivey
+
+# remove old csv
+rm -f results-spivey/bench.csv
+
+# compile and run benchmark
+stack build
+stack exec bench-spivey -- --csv plot/bench.csv >/dev/null
+
+# transform criterion results
+python scripts/transform.py results-spivey
+
+# create plots
+gnuplot scripts/plot_spivey_primes.gnu
+gnuplot scripts/plot_spivey_pipe.gnu
+gnuplot scripts/plot_spivey_seq.gnu

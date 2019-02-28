@@ -1,0 +1,35 @@
+# define variables
+WAIT_TIMEOUT=1m
+WAIT_SLEEP=1s
+
+# create results folder if not present
+mkdir results-yahoo
+
+# clean docker images
+docker rm -f $(docker ps -a -q)
+
+# compile and set up containers
+docker-compose up &
+stack build
+
+# wait for kafka to be ready
+timeout $WAIT_TIMEOUT bash -c "until telnet localhost 9092 | grep Connected; do sleep $WAIT_SLEEP; done"
+
+# wait a little
+sleep 10s
+
+# run benchmark
+echo "running benchmark..."
+stack exec bench-yahoo -- --csv results-yahoo/bench.csv
+
+# wait a little
+sleep 10s
+
+# shut down containers
+docker-compose down
+
+# transform criterion results
+python scripts/transform.py results-yahoo
+
+# create plots
+gnuplot scripts/plot_yahoo.gnu

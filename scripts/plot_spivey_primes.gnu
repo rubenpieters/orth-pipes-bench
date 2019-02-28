@@ -11,7 +11,7 @@ unset autoscale x
 set xrange [MIN:MAX+(MAX-MIN)*0.05]
 
 set terminal eps enhanced font 'Verdana,10'
-set output 'benchmark.eps'
+set output 'benchmark_primes.eps'
 
 set border linewidth 1.5
 set pointintervalbox 3

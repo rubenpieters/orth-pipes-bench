@@ -7,6 +7,7 @@ import EventRecord
 
 import Control.Exception (bracket)
 import Control.Monad
+import Control.Concurrent (threadDelay)
 import Data.Monoid
 import Data.ByteString       (ByteString)
 import Data.ByteString.Lazy  (toStrict)
@@ -16,16 +17,19 @@ import Test.QuickCheck
 import qualified Database.Redis as R
 import Kafka.Producer as KP
 
-genEventRecord :: Gen EventRecord
+genEventRecord :: Gen [EventRecord]
 genEventRecord = do
   user_id <- create "user_id" [1..100]
   page_id <- create "page_id" [1..100]
   ad_id <- create "aid_" [1..100]
-  ad_type <- oneof (return <$> ["banner", "modal", "sponsored-search", "mail", "mobile"])
-  event_type <- return "view" -- oneof (return <$> ["view", "click", "purchase"])
+  ad_type <- elements ["banner", "modal", "sponsored-search", "mail", "mobile"]
   event_time <- show <$> choose (1 :: Int, 1000000)
   ip_address <- create "ip_address" [1..100]
-  return (EventRecord user_id page_id ad_id ad_type event_type event_time ip_address)
+  return
+    [ EventRecord user_id page_id ad_id ad_type "view" event_time ip_address
+    , EventRecord user_id page_id ad_id ad_type "click" event_time ip_address
+    , EventRecord user_id page_id ad_id ad_type "purchase" event_time ip_address
+    ]
 
 create :: String -> [Int] -> Gen String
 create prefix postfixes = let
@@ -80,10 +84,13 @@ runKafkaProducer = let
 
 sendKafka :: KafkaProducer -> IO ()
 sendKafka prod = do
-  records <- replicateM 10000 (generate genEventRecord)
-  forM_ records $ \record -> do
+  records <- replicateM 1000000 (generate genEventRecord)
+  forM_ (concat records) $ \record -> do
     mErr <- produceMessage prod (mkMessage Nothing (Just (toStrict $ encode record)))
     case mErr of
+      Just (KafkaResponseError RdKafkaRespErrQueueFull) -> do
+        putStrLn "queue full, waiting 1s ..."
+        threadDelay 1000000
       Just err -> putStrLn (show err)
       Nothing -> return ()
 
