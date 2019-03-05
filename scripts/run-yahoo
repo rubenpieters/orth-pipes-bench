@@ -5,6 +5,9 @@ WAIT_SLEEP=1s
 # create results folder if not present
 mkdir results-yahoo
 
+# remove old csv
+rm -f results-yahoo/bench.csv
+
 # clean docker images
 docker rm -f $(docker ps -a -q)
 

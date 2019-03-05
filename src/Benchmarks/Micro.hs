@@ -31,6 +31,10 @@ criterion = defaultMain
   , createBenchIO "proxyrep" "concat" l1 OrthPipes.concatBench
   , createBenchIO "conduit" "concat" l1 ConduitBench.concatBench
   , createBenchIO "streamly" "concat" l1 StreamlyBench.concatBench
+  , createBenchIO "pipes" "fold" l1 PipesBench.foldBench
+  , createBenchIO "proxyrep" "fold" l1 OrthPipes.foldBench
+  , createBenchIO "conduit" "fold" l1 ConduitBench.foldBench
+  , createBenchIO "streamly" "fold" l1 StreamlyBench.foldBench
   ]
   where
-    l1 = [1, 10000, 50000, 100000, 500000, 1000000]
+    l1 = [1, 10000] --, 50000, 100000, 500000, 1000000]

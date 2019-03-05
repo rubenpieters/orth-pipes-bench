@@ -211,7 +211,7 @@ unfoldr step = go where
 
 {-# INLINE concat #-}
 concat :: Foldable f => ProxyC () (f a) () a m ()
-concat = do
+concat = forever $ do
   fa <- await
   each fa
 
@@ -249,17 +249,21 @@ source from to = unfoldr step from
         else return (Right (cnt, cnt + 1))
 
 {-# INLINE mapBench #-}
-mapBench :: Monad m => Int -> m () 
+mapBench :: Monad m => Int -> m ()
 mapBench n = runEffectPr $ construct $ source 0 n >-> map (+1) >-> forever await
 
 {-# INLINE mapMBench #-}
-mapMBench :: Monad m => Int -> m () 
+mapMBench :: Monad m => Int -> m ()
 mapMBench n = runEffectPr $ construct $ source 0 n >-> mapM return >-> forever await
 
 {-# INLINE filterBench #-}
-filterBench :: Monad m => Int -> m () 
+filterBench :: Monad m => Int -> m ()
 filterBench n = runEffectPr $ construct $ source 0 n >-> filter even >-> forever await
 
 {-# INLINE concatBench #-}
-concatBench :: Monad m => Int -> m () 
+concatBench :: Monad m => Int -> m ()
 concatBench n = runEffectPr $ construct $ source 0 n >-> map (Prelude.replicate 3) >-> concat >-> forever await
+
+{-# INLINE foldBench #-}
+foldBench :: Monad m => Int -> m Int
+foldBench n = foldResponsesPr (+) 0 (construct $ source 0 n)

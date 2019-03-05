@@ -56,7 +56,7 @@ criterion = defaultMain
   , createBenchIO "streamly" "adevents" l1 (run streamlyCode)
   ]
   where
-    l1 = [1, 5000, 10000, 50000, 100000, 500000, 1000000]
+    l1 = [1, 5000, 10000, 50000, 100000, 500000] --, 1000000]
 
 -- consumer configuration
 consumerProps :: Int -> ConsumerProperties
@@ -139,6 +139,7 @@ writeRedis conn ((campaign_id, window_time), count) = liftIO $ R.runRedis conn $
       return uuid
     Right (Just uuid) -> do
       return uuid
+  -- liftIO $ putStrLn ("CID: " ++ campaign_id)
   R.hincrby windowUUID "seen_count" (toInteger count)
   unixtime <- liftIO getUnixTime
   R.hset windowUUID "time_updated" (formatUnixTimeGMT webDateFormat unixtime)
@@ -238,7 +239,7 @@ streamlyConsumer kafkaConsumer = do
 
 streamlyCountByKey :: (MonadIO (t m), S.IsStream t, MonadTrans t, Monad m) => S.SerialT m (String, Int) -> t m ((String, Int), Int)
 streamlyCountByKey prod = do
-  resultMap <- lift $ S.foldx (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty id prod
+  resultMap <- lift $ S.foldl' (\map key -> M.insertWith (+) key (1 :: Int) map) M.empty prod
   S.fromFoldable (M.toList resultMap)
 
 streamlyCode :: Int -> KafkaConsumer -> R.Connection -> IO ()

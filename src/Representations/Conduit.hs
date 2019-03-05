@@ -6,33 +6,12 @@ import Control.Monad
 
 import Conduit
 import Data.Conduit.List as C hiding (sinkNull, map, take, filter, mapM, concat)
-import Data.Conduit.Combinators as C hiding (print, take, filter)
+import Data.Conduit.Combinators as C hiding (print)
 
 upfrom :: (Monad m) => Int -> ConduitT x Int m b
 upfrom n = do
   yield n
   upfrom (n+1)
-
-filter :: (Monad m) => (a -> Bool) -> ConduitT a a m b
-filter test = forever $
-  do
-    mX <- await
-    case mX of
-      Just x -> if test x
-        then yield x
-        else return ()
-      Nothing -> return ()
-
-take :: (Monad m) => Int -> ConduitT a a m ()
-take n = if n == 0
-  then return ()
-  else do
-    mX <- await
-    case mX of
-      Just x -> do
-        yield x
-        take (n - 1)
-      Nothing -> return ()
 
 sieve :: (Monad m) => ConduitT Int Int m ()
 sieve = do
@@ -101,17 +80,26 @@ source from to = C.unfoldM step from
         else return (Just (cnt, cnt + 1))
 
 {-# INLINE mapBench #-}
-mapBench :: Monad m => Int -> m () 
+mapBench :: Monad m => Int -> m ()
 mapBench n = runConduit (source 0 n .| C.map (+1) .| C.sinkNull)
 
 {-# INLINE mapMBench #-}
-mapMBench :: Monad m => Int -> m () 
+mapMBench :: Monad m => Int -> m ()
 mapMBench n = runConduit (source 0 n .| C.mapM return .| C.sinkNull)
 
 {-# INLINE filterBench #-}
-filterBench :: Monad m => Int -> m () 
-filterBench n = runConduit (source 0 n .| filter even .| C.sinkNull)
+filterBench :: Monad m => Int -> m ()
+filterBench n = runConduit (source 0 n .| C.filter even .| C.sinkNull)
 
 {-# INLINE concatBench #-}
-concatBench :: Monad m => Int -> m () 
+concatBench :: Monad m => Int -> m ()
 concatBench n = runConduit (source 0 n .| C.map (Prelude.replicate 3) .| C.concat .| C.sinkNull)
+
+{-# INLINE foldBench #-}
+foldBench :: Monad m => Int -> m Int
+foldBench n = runConduit (source 0 n .| C.foldl (+) 0)
+
+test :: IO ()
+test = do
+  x <- runConduit (source 0 20 .| C.filter even .| sinkList)
+  print x

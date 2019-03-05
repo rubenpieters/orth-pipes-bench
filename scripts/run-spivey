@@ -6,7 +6,7 @@ rm -f results-spivey/bench.csv
 
 # compile and run benchmark
 stack build
-stack exec bench-spivey -- --csv plot/bench.csv >/dev/null
+stack exec bench-spivey -- --csv results-spivey/bench.csv >/dev/null
 
 # transform criterion results
 python scripts/transform.py results-spivey
