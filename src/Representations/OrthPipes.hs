@@ -73,13 +73,6 @@ exit = ProxyC (\_ _ _ e -> e)
 {-# INLINE mergeProxyRep #-}
 mergeProxyRep :: (b' -> ProxyRep a' a b' b m) -> ProxyRep b' b c' c m -> ProxyRep a' a c' c m
 mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res e
-{-mergeProxyRep fb' p req res e = (mergeRR res e p . PCRep) (mergeRL req e . fb')
-  where
-  mergeRL :: PCRep a a' (m r) -> m r -> ProxyRep a' a b' b m -> (PCRep b' b (m r) -> m r)
-  mergeRL req e proxy res = proxy req res e
-  mergeRR :: PCRep c' c (m r) -> m r -> ProxyRep b' b c' c m -> (PCRep b b' (m r) -> m r)
-  mergeRR res e proxy req = proxy req res e
--}
 
 {-# INLINE (+>>) #-}
 (+>>) ::
@@ -226,9 +219,11 @@ foldProxyRep req res e proxy = proxy (fromAlg req) (fromAlg res) e
   fromAlg :: (o -> (i -> r) -> r) -> PCRep i o r
   fromAlg alg = PCRep (\o (PCRep r) -> alg o (\i -> r i (fromAlg alg)))
  
+{-# INLINE runEffectPr #-}
 runEffectPr :: (Monad m) => ProxyRep Void () () Void m -> m ()
 runEffectPr = foldResponsesPr (\_ _ -> ()) ()
 
+{-# INLINE foldResponsesPr #-}
 foldResponsesPr :: (Monad m) => (b -> o -> b) -> b -> ProxyRep x () () o m -> m b
 foldResponsesPr combine b proxy = foldProxyRep
   (\_ f -> f ())
@@ -236,6 +231,7 @@ foldResponsesPr combine b proxy = foldProxyRep
   (return b)
   proxy
 
+{-# INLINE construct #-}
 construct :: ProxyC a' a b' b m x -> ProxyRep a' a b' b m
 construct (ProxyC plan) = plan (\_ _ _ e -> e)
 
