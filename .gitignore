@@ -3,9 +3,5 @@ cabal-dev
 cabal.sandbox.config
 dist
 .stack-work
-plot/*.csv
-plot/*.tmp
 benchmark*.eps
-results-spivey/
-results-micro/
-results-yahoo/
+results-*/
