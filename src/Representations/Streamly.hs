@@ -8,10 +8,12 @@ import qualified Streamly.Prelude as S
 import Data.Function ((&))
 import Control.Monad.Trans.Class (MonadTrans, lift)
 
+{-# INLINE upfrom #-}
 upfrom :: (Monad m, IsStream t) => Int -> t m Int
 upfrom n = do
   n `S.cons` upfrom (n+1)
 
+{-# INLINE sieve #-}
 sieve :: (Monad m, IsStream t, MonadTrans t, Monad (t m)) => SerialT m Int -> t m Int
 sieve s = do
   mResult <- lift $ S.uncons s
@@ -19,6 +21,7 @@ sieve s = do
     Nothing -> error "expected infinite stream"
     Just (p, s') -> p `S.cons` sieve (S.filter (\x -> x `mod` p /= 0) s')
 
+{-# INLINE primes #-}
 primes :: (Monad m, IsStream t, MonadTrans t, Monad (t m)) => Int -> t m Int
 primes n =
     upfrom 2
@@ -28,6 +31,7 @@ primes n =
 collectPrimes :: Int -> [Int]
 collectPrimes n = runIdentity $ S.toList $ primes n
 
+{-# INLINE runPrimes #-}
 runPrimes :: Int -> IO ()
 runPrimes n = S.mapM_ (\n -> print n) (primes n)
 

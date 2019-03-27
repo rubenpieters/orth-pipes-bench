@@ -97,11 +97,13 @@ mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res 
 type Pipe a b = ProxyC () a () b
 type Producer b = ProxyC Void () () b
 
+{-# INLINE upfrom #-}
 upfrom :: (Monad m) => Int -> Pipe x Int m b
 upfrom n = do
   yield n
   upfrom (n+1)
 
+{-# INLINE filter #-}
 filter :: (Monad m) => (a -> Bool) -> Pipe a a m b
 filter test = forever $
   do
@@ -110,6 +112,7 @@ filter test = forever $
       then yield x
       else return ()
 
+{-# INLINE take #-}
 take :: (Monad m) => Int -> Pipe a a m ()
 take n = if n == 0
   then exit
@@ -118,22 +121,27 @@ take n = if n == 0
     yield x
     take (n - 1)
 
+{-# INLINE sieve #-}
 sieve :: (Monad m) => Pipe Int Int m x
 sieve = do
   p <- await
   yield p
   filter (\x -> x `mod` p /= 0) >-> sieve
 
+{-# INLINE primes #-}
 primes :: (Monad m) => Int -> Pipe () Int m ()
 primes n = upfrom 2 >-> sieve >-> take n
 
+{-# INLINE iter #-}
 iter :: Int -> (a -> a) -> a -> a
 iter n f x = loop n x where
   loop k y = if k == 0 then y else loop (k-1) (f y)
 
+{-# INLINE deepPipe #-}
 deepPipe :: (Monad m) => Int -> Pipe () Int m x
 deepPipe n = iter n (forever (return ()) >->) (forever (yield 0))
 
+{-# INLINE deepSeq #-}
 deepSeq :: (Monad m) => Int -> Pipe () Int m x
 deepSeq n = iter n (>> forever (return ())) (forever (yield 0))
 
@@ -143,21 +151,26 @@ foldInput inp = PCRep (\_ r -> inp (\i -> unPCRep r i (foldInput inp)))
 foldOutput :: (o -> a -> a) -> PCRep () o a
 foldOutput out = PCRep (\o prod -> out o (unPCRep prod () (foldOutput out)))
 
+{-# INLINE runPipesIO #-}
 runPipesIO :: (Read i, Show o) => Pipe i o IO () -> IO ()
 runPipesIO proxyc = unProxyC proxyc (\_ _ _ e -> e)
   (foldInput (\h -> do x <- readLn; h x))
   (foldOutput (\o q -> do print o; q))
   (return ())
 
+{-# INLINE runPrimes #-}
 runPrimes :: Int -> IO ()
 runPrimes n = runPipesIO (primes n)
 
+{-# INLINE runDeepPipe #-}
 runDeepPipe :: Int -> IO ()
 runDeepPipe n = runPipesIO (deepPipe n >-> take n)
 
+{-# INLINE runDeepSeq #-}
 runDeepSeq :: Int -> IO ()
 runDeepSeq n = runPipesIO (deepSeq n >-> take n)
 
+{-# INLINE runPipesCollect #-}
 runPipesCollect :: Pipe () o Identity a -> [o]
 runPipesCollect proxyc = runIdentity $ unProxyC proxyc (\_ _ _ e -> e)
   (foldInput (\h -> h ()))

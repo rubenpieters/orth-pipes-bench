@@ -1,4 +1,4 @@
-plot 'results-yahoo/adevents_conduit.tmp' using 1:2:3:4 with errorlines title "conduit" pt 6 dt 1 lc rgb '#3e9651', 'results-yahoo/adevents_pipes.tmp' using 1:2:3:4 with errorlines title "pipes" pt 4 dt 2 lc rgb '#cc2529', 'results-yahoo/adevents_streamly.tmp' using 1:2:3:4 with errorlines title "streamly" pt 9 dt 5 lc rgb '#948b3d', 'results-yahoo/adevents_proxyrep.tmp' using 1:2:3:4 with errorlines title "proxyrep" pt 2 dt 3 lc rgb '#396ab1'
+plot 'results-yahoo/adevents_conduit.tmp' using 1:2:3:4 with errorlines title "conduit" pt 6 dt 1 lw 3 lc rgb '#3e9651', 'results-yahoo/adevents_pipes.tmp' using 1:2:3:4 with errorlines title "pipes" pt 4 dt 2 lw 3 lc rgb '#cc2529', 'results-yahoo/adevents_streamly.tmp' using 1:2:3:4 with errorlines title "streamly" pt 9 dt 5 lw 3 lc rgb '#948b3d', 'results-yahoo/adevents_proxyrep.tmp' using 1:2:3:4 with errorlines title "proxyrep" pt 2 dt 3 lw 3 lc rgb '#396ab1'
 
 
 set autoscale x
@@ -22,4 +22,4 @@ set xlabel "number of stream elements (n)"
 set ylabel "time (seconds)"
 set grid ytics
 
-plot 'results-yahoo/adevents_conduit.tmp' using 1:2:3:4 with errorlines title "conduit" pt 6 dt 1 lc rgb '#3e9651', 'results-yahoo/adevents_pipes.tmp' using 1:2:3:4 with errorlines title "pipes" pt 4 dt 2 lc rgb '#cc2529', 'results-yahoo/adevents_streamly.tmp' using 1:2:3:4 with errorlines title "streamly" pt 12 dt 5 lc rgb '#948b3d', 'results-yahoo/adevents_proxyrep.tmp' using 1:2:3:4 with errorlines title "proxyrep" pt 2 dt 3 lc rgb '#396ab1'
+plot 'results-yahoo/adevents_conduit.tmp' using 1:2:3:4 with errorlines title "conduit" pt 6 dt 1 lw 3 lc rgb '#3e9651', 'results-yahoo/adevents_pipes.tmp' using 1:2:3:4 with errorlines title "pipes" pt 4 dt 2 lw 3 lc rgb '#cc2529', 'results-yahoo/adevents_streamly.tmp' using 1:2:3:4 with errorlines title "streamly" pt 12 dt 5 lw 3 lc rgb '#948b3d', 'results-yahoo/adevents_proxyrep.tmp' using 1:2:3:4 with errorlines title "proxyrep" pt 2 dt 3 lw 3 lc rgb '#396ab1'
