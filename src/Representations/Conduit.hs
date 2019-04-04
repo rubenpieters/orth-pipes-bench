@@ -108,8 +108,3 @@ concatBench n = runConduit (source 0 n .| C.map (Prelude.replicate 3) .| C.conca
 {-# INLINE foldBench #-}
 foldBench :: Monad m => Int -> m Int
 foldBench n = runConduit (source 0 n .| C.foldl (+) 0)
-
-test :: IO ()
-test = do
-  x <- runConduit (source 0 20 .| C.filter even .| sinkList)
-  print x

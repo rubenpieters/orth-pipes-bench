@@ -32,6 +32,8 @@ Library
                      , streamly == 0.6.0
                      , transformers
                      , deepseq
+                     , inspection-testing
+                     , QuickCheck
 
 
 executable bench-spivey
@@ -53,6 +55,7 @@ executable bench-spivey
                      , transformers
                      , orth-pipes-bench
                      , deepseq
+                     , inspection-testing
 
 executable bench-micro
   hs-source-dirs:      src
@@ -73,6 +76,7 @@ executable bench-micro
                      , transformers
                      , orth-pipes-bench
                      , deepseq
+                     , inspection-testing
 
 executable bench-yahoo
   hs-source-dirs:      src-yahoo
@@ -98,3 +102,4 @@ executable bench-yahoo
                      , unix-time
                      , QuickCheck
                      , random
+                     , inspection-testing

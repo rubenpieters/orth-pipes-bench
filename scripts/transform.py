@@ -37,4 +37,3 @@ for bench_name in data.keys():
             file.write(line + "\n")
 
         file.close()
-

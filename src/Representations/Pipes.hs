@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Representations.Pipes where
 
 import Prelude hiding (filter, map, drop, take)
@@ -7,6 +9,8 @@ import Pipes
 import qualified Pipes.Prelude as P
 import Control.Monad (forever)
 import Pipes.Internal
+
+import Test.Inspection
 
 {-# INLINE upfrom #-}
 upfrom :: (Monad m) => Int -> Pipe x Int m b
