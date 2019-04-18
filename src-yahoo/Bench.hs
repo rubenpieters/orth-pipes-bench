@@ -92,6 +92,7 @@ run code n = do
       closeConsumer kafkaConsumer
       R.disconnect redisConnection
 
+   
 parseJson :: Maybe ByteString -> Maybe EventRecord
 parseJson x = join (decodeStrict <$> x)
 
@@ -103,7 +104,8 @@ eventProjection :: EventRecord -> (String, String)
 eventProjection r = (ad_id r, event_time r)
 
 -- (campaign_id, ad_id, event_time)
-queryRedis :: (MonadIO m) => R.Connection -> (String, String) -> m (String, String, String)
+queryRedis :: (MonadIO m) =>
+  R.Connection -> (String, String) -> m (String, String, String)
 queryRedis conn (ad_id, event_time) = do
   eMByteString <- liftIO $ R.runRedis conn $ R.get (pack ad_id)
   -- liftIO $ putStrLn ("AID: " ++ ad_id)
@@ -145,6 +147,11 @@ writeRedis conn ((campaign_id, window_time), count) = liftIO $ R.runRedis conn $
   R.hset windowUUID "time_updated" (formatUnixTimeGMT webDateFormat unixtime)
   return ()
 
+writeSimple :: (MonadIO m) => R.Connection -> m ()
+writeSimple conn = liftIO $ R.runRedis conn $ do
+  R.set (pack "writeSimple_key") (pack "writeSimple_value")
+  return ()
+
 -- Pipes Code
 
 pipesConsumer :: (MonadIO m) => KafkaConsumer -> P.Producer (ConsumerRecord (Maybe ByteString) (Maybe ByteString)) m ()
@@ -171,6 +178,13 @@ pipesCode n kafkaConsumer redisConnection = P.runEffect $
     P.map campaignTime P.>->
     P.take n
   )) P.>-> P.mapM (writeRedis redisConnection) P.>-> forever P.await
+
+pipesSimple :: Int -> KafkaConsumer -> R.Connection -> IO ()
+pipesSimple n kafkaConsumer redisConnection = P.runEffect $
+  pipesConsumer kafkaConsumer P.>->
+  P.mapM (\_ -> writeSimple redisConnection) P.>->
+  P.take n P.>->
+  forever P.await
 
 -- Conduit Code
 
@@ -225,6 +239,13 @@ orthCode n kafkaConsumer redisConnection = O.runEffectPr $ O.construct $
     O.map campaignTime O.>->
     O.take n
   )) O.>-> O.mapM (writeRedis redisConnection) O.>-> forever O.await
+
+orthSimple :: Int -> KafkaConsumer -> R.Connection -> IO ()
+orthSimple n kafkaConsumer redisConnection = O.runEffectPr $ O.construct $
+  orthConsumer kafkaConsumer O.>->
+  O.mapM (\_ -> writeSimple redisConnection) O.>->
+  O.take n O.>->
+  forever O.await
 
 -- Streamly Code
 

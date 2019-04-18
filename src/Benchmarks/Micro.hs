@@ -37,4 +37,4 @@ criterion = defaultMain
   , createBenchIO "streamly" "fold" l1 StreamlyBench.foldBench
   ]
   where
-    l1 = [1, 10000, 50000, 100000, 500000, 1000000]
+    l1 = [1000000]
