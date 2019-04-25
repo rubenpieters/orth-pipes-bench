@@ -1,6 +1,7 @@
 -- Coroutine pipelines
 -- Copyright (c) J. M. Spivey 2017
 
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleInstances, Rank2Types #-}
 -- ExistentialQuantification for the type of Effect in DirectPipe
 -- FlexibleInstances for the instance Monad_f m => Monad (m i o)

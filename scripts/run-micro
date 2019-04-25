@@ -1,5 +1,5 @@
 # create results folder if not present
-mkdir results-micro
+mkdir -p results-micro
 
 # remove old csv
 rm -f results-micro/bench.csv

@@ -403,20 +403,20 @@ source from to = unfoldr step from
         else return (Right (cnt, cnt + 1))
 
 {-# INLINE mapBench #-}
-mapBench :: Monad m => Int -> m ()
-mapBench n = runEffectPr $ construct $ source 0 n >-> map (+1) >-> forever await
+mapBench :: Monad m => Int -> m [Int]
+mapBench n = foldResponsesPr (\x y -> y : x) [] $ construct $ source 0 n >-> map (+1)
 
 {-# INLINE mapMBench #-}
-mapMBench :: Monad m => Int -> m ()
-mapMBench n = runEffectPr $ construct $ source 0 n >-> mapM return >-> forever await
+mapMBench :: Monad m => Int -> m [Int]
+mapMBench n = foldResponsesPr (\x y -> y : x) [] $ construct $ source 0 n >-> mapM return
 
 {-# INLINE filterBench #-}
-filterBench :: Monad m => Int -> m ()
-filterBench n = runEffectPr $ construct $ source 0 n >-> filter even >-> forever await
+filterBench :: Monad m => Int -> m [Int]
+filterBench n = foldResponsesPr (\x y -> y : x) [] $ construct $ source 0 n >-> filter even
 
 {-# INLINE concatBench #-}
-concatBench :: Monad m => Int -> m ()
-concatBench n = runEffectPr $ construct $ source 0 n >-> map (Prelude.replicate 3) >-> concat >-> forever await
+concatBench :: Monad m => Int -> m [Int]
+concatBench n = foldResponsesPr (\x y -> y : x) [] $ construct $ source 0 n >-> map (Prelude.replicate 3) >-> concat
 
 {-# INLINE foldBench #-}
 foldBench :: Monad m => Int -> m Int

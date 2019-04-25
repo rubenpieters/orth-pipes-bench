@@ -86,20 +86,20 @@ source from to = P.unfoldr step from
         else return (Right (cnt, cnt + 1))
 
 {-# INLINE mapBench #-}
-mapBench :: Monad m => Int -> m ()
-mapBench n = runEffect (source 0 n >-> P.map (+1) >-> forever await)
+mapBench :: Monad m => Int -> m [Int]
+mapBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (+1) >-> forever await)
 
 {-# INLINE mapMBench #-}
-mapMBench :: Monad m => Int -> m ()
-mapMBench n = runEffect (source 0 n >-> P.mapM return >-> forever await)
+mapMBench :: Monad m => Int -> m [Int]
+mapMBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.mapM return >-> forever await)
 
 {-# INLINE filterBench #-}
-filterBench :: Monad m => Int -> m ()
-filterBench n = runEffect (source 0 n >-> P.filter even >-> forever await)
+filterBench :: Monad m => Int -> m [Int]
+filterBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.filter even >-> forever await)
 
 {-# INLINE concatBench #-}
-concatBench :: Monad m => Int -> m ()
-concatBench n = runEffect (source 0 n >-> P.map (Prelude.replicate 3) >-> P.concat >-> forever await)
+concatBench :: Monad m => Int -> m [Int]
+concatBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (Prelude.replicate 3) >-> P.concat >-> forever await)
 
 {-# INLINE foldBench #-}
 foldBench :: Monad m => Int -> m Int

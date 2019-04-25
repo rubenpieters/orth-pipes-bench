@@ -1,5 +1,5 @@
 # create results folder if not present
-mkdir results-spivey
+mkdir -p results-spivey
 
 # remove old csv
 rm -f results-spivey/bench.csv

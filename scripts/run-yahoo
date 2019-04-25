@@ -3,7 +3,7 @@ WAIT_TIMEOUT=1m
 WAIT_SLEEP=1s
 
 # create results folder if not present
-mkdir results-yahoo
+mkdir -p results-yahoo
 
 # remove old csv
 rm -f results-yahoo/bench.csv

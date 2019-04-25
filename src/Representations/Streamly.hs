@@ -45,20 +45,20 @@ source from to = S.unfoldrM step from
         else return (Just (cnt, cnt + 1))
 
 {-# INLINE mapBench #-}
-mapBench :: MonadAsync m => Int -> m ()
-mapBench n = runStream (source 0 n & S.map (+1))
+mapBench :: MonadAsync m => Int -> m [Int]
+mapBench n = S.foldl' (\x y -> y : x) [] (source 0 n & S.map (+1))
 
 {-# INLINE mapMBench #-}
-mapMBench :: MonadAsync m => Int -> m ()
-mapMBench n = runStream (source 0 n & S.mapM return)
+mapMBench :: MonadAsync m => Int -> m [Int]
+mapMBench n = S.foldl' (\x y -> y : x) [] (source 0 n & S.mapM return)
 
 {-# INLINE filterBench #-}
-filterBench :: MonadAsync m => Int -> m ()
-filterBench n = runStream (source 0 n & S.filter even)
+filterBench :: MonadAsync m => Int -> m [Int]
+filterBench n = S.foldl' (\x y -> y : x) [] (source 0 n & S.filter even)
 
 {-# INLINE concatBench #-}
-concatBench :: MonadAsync m => Int -> m ()
-concatBench n = runStream (source 0 n & S.concatMap (S.replicate 3))
+concatBench :: MonadAsync m => Int -> m [Int]
+concatBench n = S.foldl' (\x y -> y : x) [] (source 0 n & S.concatMap (S.replicate 3))
 
 {-# INLINE foldBench #-}
 foldBench :: MonadAsync m => Int -> m Int
