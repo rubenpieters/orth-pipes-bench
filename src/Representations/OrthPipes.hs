@@ -7,7 +7,7 @@ module Representations.OrthPipes where
 
 import Prelude hiding (filter, map, drop, take, mapM, concat)
 
-import Control.Monad (forever, ap, liftM, when)
+import Control.Monad (forever, ap, liftM, when, (<$!>))
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Foldable as F
@@ -385,7 +385,7 @@ runEffectPr = foldResponsesPr (\_ _ -> ()) ()
 foldResponsesPr :: (Monad m) => (b -> o -> b) -> b -> ProxyRep x () () o m b -> m b
 foldResponsesPr combine b proxy = foldProxyRep
   (\_ f -> f ())
-  (\o f -> (`combine` o) <$> (f ()))
+  (\o f -> (`combine` o) <$!> (f ()))
   (return b)
   proxy
 
