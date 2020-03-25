@@ -23,6 +23,7 @@ test = do
   check "proxyrep" OrthPipes.collectPrimes
   check "streamly" StreamlyBench.collectPrimes
 
+check :: String -> (Int -> [Int]) -> IO ()
 check str f = if primesL testN == f testN
   then return ()
   else error ("test for " ++ str ++ " gave incorrect result")

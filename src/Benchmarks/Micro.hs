@@ -10,8 +10,52 @@ import qualified Representations.ContPipe as ContPipe
 
 import Criterion.Main
 
+test :: IO ()
+test = do
+  check "pipes map" PipesBench.mapBench (== mapResult)
+  check "conduit map" ConduitBench.mapBench (== mapResult)
+  check "proxyrep map" OrthPipes.mapBench (== mapResult)
+  check "streamly map" StreamlyBench.mapBench (== mapResult)
+  --
+  check "pipes mapM" PipesBench.mapMBench (== mapMResult)
+  check "conduit mapM" ConduitBench.mapMBench (== mapMResult)
+  check "proxyrep mapM" OrthPipes.mapMBench (== mapMResult)
+  check "streamly mapM" StreamlyBench.mapMBench (== mapMResult)
+  --
+  check "pipes filter" PipesBench.filterBench (== filterResult)
+  check "conduit filter" ConduitBench.filterBench (== filterResult)
+  check "proxyrep filter" OrthPipes.filterBench (== filterResult)
+  check "streamly filter" StreamlyBench.filterBench (== filterResult)
+  --
+  check "pipes concat" PipesBench.concatBench (== concatResult)
+  check "conduit concat" ConduitBench.concatBench (== concatResult)
+  check "proxyrep concat" OrthPipes.concatBench (== concatResult)
+  check "streamly concat" StreamlyBench.concatBench (== concatResult)
+  --
+  check "pipes fold" PipesBench.foldBench (== foldResult)
+  check "conduit fold" ConduitBench.foldBench (== foldResult)
+  check "proxyrep fold" OrthPipes.foldBench (== foldResult)
+  check "streamly fold" StreamlyBench.foldBench (== foldResult)
+  where
+    mapResult = [1..1000001]
+    mapMResult = [0..1000000]
+    filterResult = filter even [0..1000000]
+    concatResult = concatMap (replicate 3) [0..1000000]
+    foldResult = sum [0..1000000]
+
+check :: (Eq a) => String -> (Int -> IO a) -> (a -> Bool) -> IO ()
+check str f checkF = do
+  result <- f testN
+  if checkF result
+    then return ()
+    else error ("test for " ++ str ++ " gave incorrect result")
+  where
+    testN = 1000000
+
+
 main :: IO ()
 main = do
+  test
   criterion
 
 criterion = defaultMain

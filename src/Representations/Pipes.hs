@@ -78,28 +78,28 @@ collectPrimes n = runPipesCollect (primes n)
 
 {-# INLINE source #-}
 source :: Monad m => Int -> Int -> Producer Int m ()
-source from to = P.unfoldr step from
+source from to = P.unfoldr step to
     where
     step cnt =
-        if cnt > to
-        then return (Left ())
-        else return (Right (cnt, cnt + 1))
+        if cnt < from
+        then return $ Left ()
+        else return (Right (cnt, cnt - 1))
 
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m [Int]
-mapBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (+1) >-> forever await)
+mapBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (+1))
 
 {-# INLINE mapMBench #-}
 mapMBench :: Monad m => Int -> m [Int]
-mapMBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.mapM return >-> forever await)
+mapMBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.mapM return)
 
 {-# INLINE filterBench #-}
 filterBench :: Monad m => Int -> m [Int]
-filterBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.filter even >-> forever await)
+filterBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.filter even)
 
 {-# INLINE concatBench #-}
 concatBench :: Monad m => Int -> m [Int]
-concatBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (Prelude.replicate 3) >-> P.concat >-> forever await)
+concatBench n = P.fold (\x y -> y : x) [] id (source 0 n >-> P.map (Prelude.replicate 3) >-> P.concat)
 
 {-# INLINE foldBench #-}
 foldBench :: Monad m => Int -> m Int
