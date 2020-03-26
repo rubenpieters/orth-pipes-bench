@@ -56,7 +56,7 @@ criterion = defaultMain
   , createBenchIO "streamly" "adevents" l1 (run streamlyCode)
   ]
   where
-    l1 = [1, 5000, 10000, 50000, 100000, 500000] --, 1000000]
+    l1 = [1, 100000, 300000, 500000]
 
 -- consumer configuration
 consumerProps :: Int -> ConsumerProperties

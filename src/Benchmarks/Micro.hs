@@ -52,7 +52,6 @@ check str f checkF = do
   where
     testN = 1000000
 
-
 main :: IO ()
 main = do
   test
@@ -75,10 +74,12 @@ criterion = defaultMain
   , createBenchIO "proxyrep" "concat" l1 OrthPipes.concatBench
   , createBenchIO "conduit" "concat" l1 ConduitBench.concatBench
   , createBenchIO "streamly" "concat" l1 StreamlyBench.concatBench
-  , createBenchIO "pipes" "fold" l1 PipesBench.foldBench
-  , createBenchIO "proxyrep" "fold" l1 OrthPipes.foldBench
-  , createBenchIO "conduit" "fold" l1 ConduitBench.foldBench
-  , createBenchIO "streamly" "fold" l1 StreamlyBench.foldBench
+  , createBenchIO "pipes" "fold" l2 PipesBench.foldBench
+  , createBenchIO "proxyrep" "fold" l3 OrthPipes.foldBench
+  , createBenchIO "conduit" "fold" (take 5 l1) ConduitBench.foldBench
+  , createBenchIO "streamly" "fold" (take 5 l1) StreamlyBench.foldBench
   ]
   where
-    l1 = [1000000]
+    l1 = [1, 200000, 400000, 600000, 800000, 1000000]
+    l2 = [1, 50000, 100000, 150000, 200000]
+    l3 = [1, 10000, 20000, 30000, 40000]

@@ -9,7 +9,12 @@ stack build
 stack exec bench-micro -- --csv results-micro/bench.csv >/dev/null
 
 # transform criterion results
-python scripts/transform_micro.py results-micro
+python scripts/transform.py results-micro
 
 # create plots
-gnuplot scripts/plot_micro.gnu
+gnuplot scripts/plot_micro_map.gnu
+gnuplot scripts/plot_micro_mapM.gnu
+gnuplot scripts/plot_micro_filter.gnu
+gnuplot scripts/plot_micro_concat.gnu
+gnuplot scripts/plot_micro_fold.gnu
+
