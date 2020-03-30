@@ -92,7 +92,6 @@ run code n = do
       closeConsumer kafkaConsumer
       R.disconnect redisConnection
 
-   
 parseJson :: Maybe ByteString -> Maybe EventRecord
 parseJson x = join (decodeStrict <$> x)
 

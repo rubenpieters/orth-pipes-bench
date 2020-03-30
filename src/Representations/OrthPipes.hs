@@ -7,7 +7,7 @@ module Representations.OrthPipes where
 
 import Prelude hiding (filter, map, drop, take, mapM, concat)
 
-import Control.Monad (forever, ap, liftM, when, (<$!>))
+import Control.Monad (forever, ap, liftM, when)
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Foldable as F
@@ -22,10 +22,11 @@ import System.IO.Unsafe
 newtype PCRep i o a = PCRep { unPCRep :: o -> PCRep o i a -> a }
 
 type ProxyRep a' a b' b m r =
-  PCRep a a' (m r) ->  -- request
-  PCRep b' b (m r) ->  -- respond
-  m r ->               -- exit
-  m r
+  PCRep a a' r ->         -- request
+  PCRep b' b r ->         -- respond
+  (m r -> r) ->           -- lift
+  r ->                    -- exit
+  r
 
 data ProxyC a' a b' b m x = ProxyC { unProxyC :: !(forall r.
     (x -> ProxyRep a' a b' b m r) -> ProxyRep a' a b' b m r
@@ -43,22 +44,16 @@ instance Monad (ProxyC a' a b' b m) where
   p >>= f = ProxyC (\k -> unProxyC p (\x -> unProxyC (f x) k))
 
 instance MonadTrans (ProxyC a' a b' b) where
-  lift ma = ProxyC (\k req res e -> do
-      a <- ma
-      k a req res e
-    )
+  lift ma = ProxyC (\k req res m e -> m (fmap ((\proxy -> proxy req res m e) . k) ma))
 
 instance (MonadIO m) => MonadIO (ProxyC a' a b' b m) where
-  liftIO ma = ProxyC (\k req res e -> do
-      a <- liftIO ma
-      k a req res e
-    )
+  liftIO ma = ProxyC (\k req res m e -> m (fmap ((\proxy -> proxy req res m e) . k) (liftIO ma)))
 
 {-# INLINE[1] yield #-}
 yield :: a -> ProxyC x' x a' a m a'
-yield a = ProxyC (\k req res e ->
+yield a = ProxyC (\k req res m e ->
     unPCRep res a (PCRep (\x res' ->
-      k x req res' e
+      k x req res' m e
   )))
 
 {-# INLINE[1] respond #-}
@@ -67,9 +62,9 @@ respond = yield
 
 {-# INLINE request #-}
 request :: a' -> ProxyC a' a y' y m a
-request a' = ProxyC (\k req res e ->
+request a' = ProxyC (\k req res m e ->
     unPCRep req a' (PCRep (\x req' ->
-      k x req' res e
+      k x req' res m e
   )))
 
 {-# INLINE[1] await #-}
@@ -78,7 +73,7 @@ await = request ()
 
 {-# INLINE exit #-}
 exit :: ProxyC a' a b' b m x
-exit = ProxyC (\_ _ _ e -> e)
+exit = ProxyC (\_ _ _ _ e -> e)
 
 pull :: a' -> ProxyC a' a a' a m r
 pull = go
@@ -93,7 +88,7 @@ mergeProxyRep ::
   (b' -> ProxyRep a' a b' b m r) ->
   ProxyRep b' b c' c m r ->
   ProxyRep a' a c' c m r
-mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res e
+mergeProxyRep fp q = \req res m e -> q (PCRep (\b' res' -> fp b' req res' m e)) res m e
 
 {-# INLINE (+>>) #-}
 (+>>) ::
@@ -101,8 +96,8 @@ mergeProxyRep fp q = \req res e -> q (PCRep (\b' res' -> fp b' req res' e)) res 
   ProxyC b' b c' c m r ->
   ProxyC a' a c' c m r
 (+>>) fp q = ProxyC (\_ -> mergeProxyRep
-    ((\p -> unProxyC p (\_ _ _ e -> e)) . fp)
-    (unProxyC q (\_ _ _ e -> e))
+    ((\p -> unProxyC p (\_ _ _ _ e -> e)) . fp)
+    (unProxyC q (\_ _ _ _ e -> e))
   )
 
 {-
@@ -159,7 +154,6 @@ filter test = forever $
       "p >-> filter predicate" forall p predicate.
           p >-> filter predicate = for p (\a -> when (predicate a) (yield a))
     #-}
-  
 
 {-# INLINE take #-}
 take :: (Monad m) => Int -> Pipe a a m ()
@@ -202,9 +196,10 @@ foldOutput out = PCRep (\o prod -> out o (unPCRep prod () (foldOutput out)))
 
 {-# INLINE runPipesIO #-}
 runPipesIO :: (Read i, Show o, Show a) => Pipe i o IO a -> IO ()
-runPipesIO proxyc = unProxyC proxyc (\a _ _ _ -> putStrLn ("RETURN: " ++ show a))
+runPipesIO proxyc = unProxyC proxyc (\a _ _ _ _ -> putStrLn ("RETURN: " ++ show a))
   (foldInput (\h -> do x <- readLn; h x))
   (foldOutput (\o q -> do print o; q))
+  (undefined)
   (return ())
 
 {-# INLINE runPrimes #-}
@@ -221,9 +216,10 @@ runDeepSeq n = runPipesIO (deepSeq n >-> take n)
 
 {-# INLINE runPipesCollect #-}
 runPipesCollect :: Pipe () o Identity a -> [o]
-runPipesCollect proxyc = runIdentity $ unProxyC proxyc (\_ _ _ e -> e)
+runPipesCollect proxyc = runIdentity $ unProxyC proxyc (\_ _ _ _ e -> e)
   (foldInput (\h -> h ()))
   (foldOutput (\o (Identity q) -> return (o : q)))
+  (undefined)
   (return [])
 
 deepPipePure :: Int -> [Int]
@@ -281,14 +277,14 @@ each :: Foldable f => f a -> ProxyC x' x () a m ()
 each = F.foldr (\a p -> yield a >> p) (return ())
 
 {-# INLINE unfoldr #-}
-unfoldr :: Monad m 
+unfoldr :: Monad m
   => (s -> m (Either r (a, s))) -> s -> ProxyC x' x () a m r
 unfoldr step = go where
   go s0 = do
     e <- lift (step s0)
     case e of
       Left r -> return r
-      Right (a,s) -> do 
+      Right (a,s) -> do
         _ <- yield a
         go s
 
@@ -307,16 +303,17 @@ for ::
   ProxyC x' x b' b m a ->
   (b -> ProxyC x' x c' c m b') ->
   ProxyC x' x c' c m a
-for p f = ProxyC $ \k req res e -> u $ do
+for p f = ProxyC $ \k req res m e -> u $ do
   ref <- newIORef res
   return $ unProxyC p
-    (\a req' _ e' -> u $ do res' <- readIORef ref ; return $ k a req' res' e')
+    (\a req' _ m' e' -> u $ do res' <- readIORef ref ; return $ k a req' res' m' e')
     req
-    (go ref req res e)
+    (go ref req res m e)
+    m
     e
     where
-      go ref req res e = PCRep $ \m (PCRep g) ->
-        unProxyC (f m) (\x req' res' e' -> u $ do modifyIORef' ref (\_ -> res') ; return $ g x (go ref req' res' e')) req res e
+      go ref req res ma e = PCRep $ \m (PCRep g) ->
+        unProxyC (f m) (\x req' res' ma' e' -> u $ do modifyIORef' ref (\_ -> res') ; return $ g x (go ref req' res' ma' e')) req res ma e
       u = unsafePerformIO
 
 {-# RULES
@@ -368,39 +365,42 @@ p >~ q = (\() -> go) +>> q
 
 {-# INLINE foldProxyRep #-}
 foldProxyRep ::
-  (a' -> (a -> (m r)) -> (m r)) ->
-  (b -> (b' -> (m r)) -> (m r)) ->
-  m r ->
-  ProxyRep a' a b' b m r -> m r
-foldProxyRep req res e proxy = proxy (fromAlg req) (fromAlg res) e
+  (a' -> (a -> r) -> r) ->
+  (b -> (b' -> r) -> r) ->
+  (m r -> r) ->
+  r ->
+  ProxyRep a' a b' b m r -> r
+foldProxyRep req res m e proxy = proxy (fromAlg req) (fromAlg res) m e
   where
   fromAlg :: (o -> (i -> r) -> r) -> PCRep i o r
   fromAlg alg = PCRep (\o (PCRep r) -> alg o (\i -> r i (fromAlg alg)))
 
 {-# INLINE runEffectPr #-}
-runEffectPr :: (Monad m) => ProxyRep Void () () Void m () -> m ()
+runEffectPr :: (Monad m) => (forall r. ProxyRep Void () () Void m r) -> m ()
 runEffectPr = foldResponsesPr (\_ _ -> ()) ()
 
 {-# INLINE foldResponsesPr #-}
-foldResponsesPr :: (Monad m) => (b -> o -> b) -> b -> ProxyRep x () () o m b -> m b
+foldResponsesPr :: (Monad m) => (b -> o -> b) -> b -> (forall r. ProxyRep x () () o m r) -> m b
 foldResponsesPr combine b proxy = foldProxyRep
   (\_ f -> f ())
-  (\o f -> (`combine` o) <$!> (f ()))
-  (return b)
+  (\o f x -> f () $! (x `combine` o))
+  (\m x -> m >>= \p -> p x)
+  return
   proxy
+  b
 
 {-# INLINE construct #-}
 construct :: ProxyC a' a b' b m x -> ProxyRep a' a b' b m r
-construct (ProxyC plan) = plan (\_ _ _ e -> e)
+construct (ProxyC plan) = plan (\_ _ _ _ e -> e)
 
 {-# INLINE source #-}
 source :: Monad m => Int -> Int -> ProxyC x' x () Int m ()
-source from to = unfoldr step from
+source from to = unfoldr step to
     where
     step cnt =
-        if cnt > to
-        then return (Left ())
-        else return (Right (cnt, cnt + 1))
+        if cnt < from
+        then return $ Left ()
+        else return (Right (cnt, cnt - 1))
 
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m [Int]
@@ -422,7 +422,7 @@ concatBench n = foldResponsesPr (\x y -> y : x) [] $ construct $ source 0 n >-> 
 foldBench :: Monad m => Int -> m Int
 foldBench n = foldResponsesPr (+) 0 (construct $ source 0 n)
 
--- fusion sanity check 
+-- fusion sanity check
 
 lhs :: Monad m => ProxyC x' x () Int m ()
 lhs = source 0 1000 >-> map (+1) >-> map (+1)
