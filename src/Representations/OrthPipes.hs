@@ -44,7 +44,14 @@ instance Monad (ProxyC a' a b' b m) where
   p >>= f = ProxyC (\k -> unProxyC p (\x -> unProxyC (f x) k))
 
 instance MonadTrans (ProxyC a' a b' b) where
-  lift ma = ProxyC (\k req res m e -> m (fmap ((\proxy -> proxy req res m e) . k) ma))
+  lift = _lift
+
+_lift :: (Monad m) => m x -> ProxyC a' a b' b m x
+_lift ma = ProxyC (\k req res m e -> m (fmap ((\proxy -> proxy req res m e) . k) ma))
+
+{-# RULES
+      "_lift . return" forall x. _lift (return x) = return x
+ #-}
 
 instance (MonadIO m) => MonadIO (ProxyC a' a b' b m) where
   liftIO ma = ProxyC (\k req res m e -> m (fmap ((\proxy -> proxy req res m e) . k) (liftIO ma)))
@@ -395,12 +402,12 @@ construct (ProxyC plan) = plan (\_ _ _ _ e -> e)
 
 {-# INLINE source #-}
 source :: Monad m => Int -> Int -> ProxyC x' x () Int m ()
-source from to = unfoldr step to
+source from to = unfoldr (return . step) to
     where
     step cnt =
         if cnt < from
-        then return $ Left ()
-        else return (Right (cnt, cnt - 1))
+        then Left ()
+        else Right (cnt, cnt - 1)
 
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m [Int]

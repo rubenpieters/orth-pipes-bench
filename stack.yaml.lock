@@ -5,22 +5,15 @@
 
 packages:
 - completed:
-    hackage: hw-kafka-client-2.6.0@sha256:f8d20f3b88dee2c798b6b7f1b177a5e54a9aa5f4c1c7c8127847b5a555451cd8,3485
+    hackage: hw-kafka-client-3.0.0@sha256:a4757287b765de252f5f183e003eaf63c2c0acda051bdd72fd3f8610ca1f3cee,3172
     pantry-tree:
-      size: 2134
-      sha256: 6445ca90351c7f32becfec68a53ea02a07a15ed6b6e8662415550fcc90c5fe62
+      size: 2055
+      sha256: e846e5d799beab5c83a91d6a9c93b54c9e86fc3a8eda9bd389216d44f5c9c809
   original:
-    hackage: hw-kafka-client-2.6.0
-- completed:
-    hackage: hedis-0.12.0@sha256:def9f745d0cf8d9cea45cd81e26bead9b1b608c74b6aad9ec654578b5b6d5a4c,4988
-    pantry-tree:
-      size: 1134
-      sha256: 55b16b9b285d679f5c1be31d55257b22cd4484c5ff31e639cd0cc38a0da7ee81
-  original:
-    hackage: hedis-0.12.0
+    hackage: hw-kafka-client-3.0.0
 snapshots:
 - completed:
-    size: 491909
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2019/2/27.yaml
-    sha256: 024e7b34b021c548cd81acee015d2411c51568f670ef7668832420765fb6c96b
-  original: nightly-2019-02-27
+    size: 491387
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/6.yaml
+    sha256: 8d81505a6de861e167a58534ab62330afb75bfa108735c7db1204f7ef2a39d79
+  original: lts-15.6

@@ -78,12 +78,12 @@ collectPrimes n = runPipesCollect (primes n)
 
 {-# INLINE source #-}
 source :: Monad m => Int -> Int -> Producer Int m ()
-source from to = P.unfoldr step to
+source from to = P.unfoldr (return . step) to
     where
     step cnt =
         if cnt < from
-        then return $ Left ()
-        else return (Right (cnt, cnt - 1))
+        then Left ()
+        else Right (cnt, cnt - 1)
 
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m [Int]

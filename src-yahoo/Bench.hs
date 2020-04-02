@@ -263,7 +263,7 @@ streamlyCountByKey prod = do
   S.fromFoldable (M.toList resultMap)
 
 streamlyCode :: Int -> KafkaConsumer -> R.Connection -> IO ()
-streamlyCode n kafkaConsumer redisConnection = S.runStream $
+streamlyCode n kafkaConsumer redisConnection = S.drain $
   streamlyCountByKey (streamlyConsumer kafkaConsumer
       & S.map crValue
       & S.map parseJson

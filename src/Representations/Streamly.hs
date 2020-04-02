@@ -37,12 +37,12 @@ runPrimes n = S.mapM_ (\n -> print n) (primes n)
 
 {-# INLINE source #-}
 source :: MonadAsync m => Int -> Int -> SerialT m Int
-source from to = S.unfoldrM step to
+source from to = S.unfoldrM (return . step) to
     where
     step cnt =
         if cnt < from
-        then return Nothing
-        else return (Just (cnt, cnt - 1))
+        then Nothing
+        else Just (cnt, cnt - 1)
 
 {-# INLINE mapBench #-}
 mapBench :: MonadAsync m => Int -> m [Int]

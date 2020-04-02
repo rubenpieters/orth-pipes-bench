@@ -82,28 +82,28 @@ collectPrimes n = runConduitCollect (primes n)
 
 {-# INLINE source #-}
 source :: Monad m => Int -> Int -> ConduitT () Int m ()
-source from to = C.unfoldM step from
+source from to = C.unfoldM (return . step) to
     where
     step cnt =
-        if cnt > to
-        then return Nothing
-        else return (Just (cnt, cnt + 1))
+        if cnt < from
+        then Nothing
+        else Just (cnt, cnt - 1)
 
 {-# INLINE mapBench #-}
 mapBench :: Monad m => Int -> m [Int]
-mapBench n = runConduit (source 0 n .| C.map (+1) .| C.sinkList)
+mapBench n = runConduit (source 0 n .| C.map (+1) .| C.foldl (\x y -> y : x) [])
 
 {-# INLINE mapMBench #-}
 mapMBench :: Monad m => Int -> m [Int]
-mapMBench n = runConduit (source 0 n .| C.mapM return .| C.sinkList)
+mapMBench n = runConduit (source 0 n .| C.mapM return .| C.foldl (\x y -> y : x) [])
 
 {-# INLINE filterBench #-}
 filterBench :: Monad m => Int -> m [Int]
-filterBench n = runConduit (source 0 n .| C.filter even .| C.sinkList)
+filterBench n = runConduit (source 0 n .| C.filter even .| C.foldl (\x y -> y : x) [])
 
 {-# INLINE concatBench #-}
 concatBench :: Monad m => Int -> m [Int]
-concatBench n = runConduit (source 0 n .| C.map (Prelude.replicate 3) .| C.concat .| C.sinkList)
+concatBench n = runConduit (source 0 n .| C.map (Prelude.replicate 3) .| C.concat .| C.foldl (\x y -> y : x) [])
 
 {-# INLINE foldBench #-}
 foldBench :: Monad m => Int -> m Int
